@@ -6,10 +6,13 @@ import { getTxDetails } from "./util";
 import {
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
+  getMint,
   getOrCreateAssociatedTokenAccount,
+  getTokenMetadata,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
 import { assert } from "chai";
+import { Metaplex } from "@metaplex-foundation/js";
 
 const GLOBAL_SEED = "global";
 const METADATA_SEED = "metadata";
@@ -18,6 +21,9 @@ const BONDING_CURVE_SEED = "bonding-curve";
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
+
+const DEFAULT_DECIMALS = 6;
+const DEFAULT_TOKEN_BALANCE = 10000000;
 
 describe("curve-social", () => {
   // Configure the client to use the local cluster.
@@ -59,7 +65,6 @@ describe("curve-social", () => {
   });
 
   it("Is initialized!", async () => {
-    // Add your test here.
     const initializeTx = await program.methods
       .initialize()
       .accounts({
@@ -96,8 +101,12 @@ describe("curve-social", () => {
       true
     );
 
+    let name = "test";
+    let symbol = "tst";
+    let uri = "https://www.test.com";
+
     const createTx = await program.methods
-      .create("test", "tst", "https://www.test.com")
+      .create(name, symbol, uri)
       .accounts({
         mint: mint.publicKey,
         creator: tokenCreator.publicKey,
@@ -109,6 +118,21 @@ describe("curve-social", () => {
       })
       .signers([mint, tokenCreator])
       .rpc();
+
+      const tokenAmount = await connection.getTokenAccountBalance(bondingCurveTokenAccount);
+      assert.equal(tokenAmount.value.amount, DEFAULT_TOKEN_BALANCE.toString());
+
+      const createdMint = await getMint(connection, mint.publicKey);
+      assert.equal(createdMint.isInitialized, true);
+      assert.equal(createdMint.decimals, DEFAULT_DECIMALS);
+      assert.equal(createdMint.supply, BigInt(DEFAULT_TOKEN_BALANCE));
+      assert.equal(createdMint.mintAuthority, null);
+
+      const metaplex = Metaplex.make(connection);
+      const token = await metaplex.nfts().findByMint({ mintAddress: mint.publicKey });
+      assert.equal(token.name, name);
+      assert.equal(token.symbol, symbol);
+      assert.equal(token.uri, uri);
   });
 
   it("can buy a token", async () => {
