@@ -105,7 +105,7 @@ describe("curve-social", () => {
         mintAuthority: mintAuthorityPDA,
         bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
-        //global: globalPDA,
+        global: globalPDA,
         systemProgram: SystemProgram.programId,
         tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
         associatedTokenProgram: new PublicKey(ASSOCIATED_TOKEN_PROGRAM_ID),

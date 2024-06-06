@@ -9,7 +9,7 @@ use anchor_spl::{
         self, mint_to, spl_token::instruction::AuthorityType, Mint, MintTo, Token, TokenAccount,
     },
 };
-
+use std::str::FromStr;
 use crate::state::{BondingCurve, Global};
 
 #[derive(Accounts)]
@@ -28,11 +28,8 @@ pub struct Create<'info> {
 
     /// CHECK: New account for mint_authority
     #[account(
-        init_if_needed,
-        payer = creator,
         seeds=[b"mint-authority"],
         bump,
-        space = 8
     )]
     mint_authority: UncheckedAccount<'info>,
 
@@ -53,11 +50,11 @@ pub struct Create<'info> {
     )]
     bonding_curve_token_account: Box<Account<'info, TokenAccount>>,
 
-    // #[account(
-    //     seeds = [Global::SEED_PREFIX],
-    //     bump,
-    // )]
-    // global: Box<Account<'info, Global>>,
+    #[account(
+        seeds = [Global::SEED_PREFIX],
+        bump,
+    )]
+    global: Box<Account<'info, Global>>,
     
     /// CHECK: New Metaplex Account being created
     #[account(mut)]
@@ -75,10 +72,8 @@ pub struct Create<'info> {
 }
 
 pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
-    msg!(name.as_str());
-    msg!(symbol.as_str());
-    msg!(uri.as_str());
 
+    //let (_, mint_authority_bump) = Pubkey::find_program_address(&[b"mint-authority"], &Pubkey::from_str("GVapdHoG4xjJZpvGPd8EUBaUJKR5Txpf6VHnVwBVCY69").unwrap());
     let seeds = &["mint-authority".as_bytes(), &[ctx.bumps.mint_authority]];
     let signer = [&seeds[..]];
 
@@ -91,12 +86,12 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
         collection: None,
         uses: None,
     };
-
+    
     let metadata_ctx = CpiContext::new_with_signer(
         ctx.accounts.token_metadata_program.to_account_info(),
         CreateMetadataAccountsV3 {
             payer: ctx.accounts.creator.to_account_info(),
-            update_authority: ctx.accounts.mint.to_account_info(),
+            update_authority: ctx.accounts.mint_authority.to_account_info(),
             mint: ctx.accounts.mint.to_account_info(),
             metadata: ctx.accounts.metadata.to_account_info(),
             mint_authority: ctx.accounts.mint_authority.to_account_info(),
@@ -119,7 +114,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
             },
             &signer,
         ),
-        10_000_000,
+        ctx.accounts.global.initial_token_supply,
     )?;
 
     //remove mint_authority
@@ -132,7 +127,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
         &signer,
     );
     token::set_authority(cpi_context, AuthorityType::MintTokens, None)?;
-
+    
     let bonding_curve = &mut ctx.accounts.bonding_curve;
     bonding_curve.virtual_sol_reserve = 0;
     bonding_curve.virtual_token_reserve = 0;
@@ -140,6 +135,6 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     bonding_curve.real_token_reserve = 10_000_000;
     bonding_curve.token_total_supply = 10_000_000;
     bonding_curve.complete = false;
-
+  
     Ok(())
 }
