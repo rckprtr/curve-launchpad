@@ -41,12 +41,6 @@ pub struct Sell<'info> {
 }
 
 pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
-    let from_account = &ctx.accounts.bonding_curve;
-    let to_account = &ctx.accounts.user;
-    //confusing
-    // **from_account.to_account_info().try_borrow_mut_lamports()? -= min_sol_output;
-    // **to_account.try_borrow_mut_lamports()? += min_sol_output;
-    
 
     //transfer SPL
     let cpi_accounts = Transfer {
@@ -67,6 +61,14 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
         ),
         token_amount,
     )?;
+
+    //transfer SOL back to user
+    let from_account = &ctx.accounts.bonding_curve;
+    let to_account = &ctx.accounts.user;
+    
+    **from_account.to_account_info().try_borrow_mut_lamports()? -= min_sol_output;
+    **to_account.try_borrow_mut_lamports()? += min_sol_output;
+
 
     let bonding_curve = &mut ctx.accounts.bonding_curve;
     bonding_curve.real_token_reserve += token_amount;
