@@ -1,22 +1,15 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { CurveSocial } from "../target/types/curve_social";
-import {
-  LAMPORTS_PER_SOL,
-  PublicKey,
-  SYSVAR_RENT_PUBKEY,
-  SystemProgram,
-  Transaction,
-  sendAndConfirmTransaction,
-} from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { getTxDetails } from "./util";
 import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
+import { assert } from "chai";
 
 const GLOBAL_SEED = "global";
 const METADATA_SEED = "metadata";
@@ -113,6 +106,7 @@ describe("curve-social", () => {
       .rpc();
   });
 
+  
   it("can buy a token", async () => {
     const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
       [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
@@ -178,4 +172,33 @@ describe("curve-social", () => {
       .signers([tokenCreator])
       .rpc();
   });
+
+  it("can set params", async () => {
+    const setParamsTx = await program.methods
+      .setParams(
+        TOKEN_METADATA_PROGRAM_ID,
+        new BN(1000),
+        new BN(1000),
+        new BN(1000),
+        new BN(1000),
+        new BN(100)
+      )
+      .accounts({
+        user: authority.publicKey,
+        global: globalPDA,
+      })
+      .signers([authority])
+      .rpc();
+
+    let global = await program.account.global.fetch(globalPDA);
+
+    assert.equal(global.feeRecipient.toBase58(), TOKEN_METADATA_PROGRAM_ID.toBase58());
+    assert.equal(global.initialVirtualTokenReserves.toString(), new BN(1000).toString());
+    assert.equal(global.initialVirtualSolReserves.toString(), new BN(1000).toString());
+    assert.equal(global.initialRealTokenReserves.toString(), new BN(1000).toString());
+    assert.equal(global.initialTokenSupply.toString(), new BN(1000).toString());
+    assert.equal(global.feeBasisPoints.toString(), new BN(100).toString());
+
+  });
+
 });
