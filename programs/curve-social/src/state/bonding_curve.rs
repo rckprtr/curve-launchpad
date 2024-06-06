@@ -15,4 +15,9 @@ pub struct BondingCurve {
 
 impl BondingCurve {
    pub const SEED_PREFIX: &'static [u8; 13] = b"bonding-curve";
+   //calculate buy
+
+
+   //calculate sell with fees
+
 }

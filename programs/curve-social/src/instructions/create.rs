@@ -9,7 +9,6 @@ use anchor_spl::{
         self, mint_to, spl_token::instruction::AuthorityType, Mint, MintTo, Token, TokenAccount,
     },
 };
-use std::str::FromStr;
 use crate::state::{BondingCurve, Global};
 
 #[derive(Accounts)]
@@ -73,7 +72,6 @@ pub struct Create<'info> {
 
 pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
 
-    //let (_, mint_authority_bump) = Pubkey::find_program_address(&[b"mint-authority"], &Pubkey::from_str("GVapdHoG4xjJZpvGPd8EUBaUJKR5Txpf6VHnVwBVCY69").unwrap());
     let seeds = &["mint-authority".as_bytes(), &[ctx.bumps.mint_authority]];
     let signer = [&seeds[..]];
 
@@ -132,8 +130,8 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     bonding_curve.virtual_sol_reserve = 0;
     bonding_curve.virtual_token_reserve = 0;
     bonding_curve.real_sol_reserve = 0;
-    bonding_curve.real_token_reserve = 10_000_000;
-    bonding_curve.token_total_supply = 10_000_000;
+    bonding_curve.real_token_reserve = ctx.accounts.global.initial_token_supply;
+    bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
     bonding_curve.complete = false;
   
     Ok(())

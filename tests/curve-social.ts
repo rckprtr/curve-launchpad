@@ -13,6 +13,7 @@ import { getTxDetails } from "./util";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
+  getAssociatedTokenAddressSync,
   getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
@@ -106,12 +107,7 @@ describe("curve-social", () => {
         bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         global: globalPDA,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
-        associatedTokenProgram: new PublicKey(ASSOCIATED_TOKEN_PROGRAM_ID),
-        tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
         metadata: metadataPDA,
-        rent: SYSVAR_RENT_PUBKEY,
       })
       .signers([mint, tokenCreator])
       .rpc();
@@ -123,7 +119,7 @@ describe("curve-social", () => {
       program.programId
     );
 
-    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
+    const bondingCurveTokenAccount = await getAssociatedTokenAddressSync(
       mint.publicKey,
       bondingCurvePDA,
       true
@@ -145,7 +141,6 @@ describe("curve-social", () => {
         bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
       })
       .signers([tokenCreator])
       .rpc();
@@ -179,8 +174,6 @@ describe("curve-social", () => {
         bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
-        systemProgram: SystemProgram.programId,
-        tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
       })
       .signers([tokenCreator])
       .rpc();

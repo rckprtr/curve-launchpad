@@ -43,7 +43,7 @@ pub struct Buy<'info> {
 }
 
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
-    let global = &mut ctx.accounts.global;
+    let _global = &mut ctx.accounts.global;
 
     let from_account = &ctx.accounts.user;
     let to_account = &ctx.accounts.bonding_curve;

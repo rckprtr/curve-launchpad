@@ -1,5 +1,5 @@
 use crate::state::{BondingCurve, Global};
-use anchor_lang::{prelude::*, system_program};
+use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 #[derive(Accounts)]
 pub struct Sell<'info> {
