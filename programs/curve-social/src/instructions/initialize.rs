@@ -29,6 +29,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
 
     global.authority = *ctx.accounts.authority.to_account_info().key;
     global.initialized = true;
+    global.initial_token_supply = 10_000_000;
 
     msg!("Initialized global state");
 

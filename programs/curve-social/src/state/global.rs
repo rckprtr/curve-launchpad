@@ -7,6 +7,7 @@ use anchor_lang::prelude::*;
 pub struct Global {
     pub authority: Pubkey,
     pub initialized: bool,
+    pub initial_token_supply: u64,
 }
 
 impl Global {
