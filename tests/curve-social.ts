@@ -69,10 +69,10 @@ describe("curve-social", () => {
       .signers([authority])
       .rpc();
 
-      let global = await program.account.global.fetch(globalPDA);
+    let global = await program.account.global.fetch(globalPDA);
 
-      assert.equal(global.authority.toBase58(), authority.publicKey.toBase58());
-      assert.equal(global.initialized, true);
+    assert.equal(global.authority.toBase58(), authority.publicKey.toBase58());
+    assert.equal(global.initialized, true);
   });
 
   it("can mint a token", async () => {
@@ -111,7 +111,6 @@ describe("curve-social", () => {
       .rpc();
   });
 
-  
   it("can buy a token", async () => {
     const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
       [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
@@ -197,13 +196,23 @@ describe("curve-social", () => {
 
     let global = await program.account.global.fetch(globalPDA);
 
-    assert.equal(global.feeRecipient.toBase58(), TOKEN_METADATA_PROGRAM_ID.toBase58());
-    assert.equal(global.initialVirtualTokenReserves.toString(), new BN(1000).toString());
-    assert.equal(global.initialVirtualSolReserves.toString(), new BN(1000).toString());
-    assert.equal(global.initialRealTokenReserves.toString(), new BN(1000).toString());
+    assert.equal(
+      global.feeRecipient.toBase58(),
+      TOKEN_METADATA_PROGRAM_ID.toBase58()
+    );
+    assert.equal(
+      global.initialVirtualTokenReserves.toString(),
+      new BN(1000).toString()
+    );
+    assert.equal(
+      global.initialVirtualSolReserves.toString(),
+      new BN(1000).toString()
+    );
+    assert.equal(
+      global.initialRealTokenReserves.toString(),
+      new BN(1000).toString()
+    );
     assert.equal(global.initialTokenSupply.toString(), new BN(1000).toString());
     assert.equal(global.feeBasisPoints.toString(), new BN(100).toString());
-
   });
-
 });
