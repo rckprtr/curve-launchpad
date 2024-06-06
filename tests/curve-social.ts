@@ -68,6 +68,11 @@ describe("curve-social", () => {
       })
       .signers([authority])
       .rpc();
+
+      let global = await program.account.global.fetch(globalPDA);
+
+      assert.equal(global.authority.toBase58(), authority.publicKey.toBase58());
+      assert.equal(global.initialized, true);
   });
 
   it("can mint a token", async () => {
