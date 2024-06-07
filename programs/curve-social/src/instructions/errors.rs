@@ -9,4 +9,10 @@ pub enum CurveSocialError {
     NotInitialized,
     #[msg("Invalid Authority")]
     InvalidAuthority,
+    #[msg("Bonding Curve Complete")]
+    BondingCurveComplete,
+    #[msg("Insufficient Tokens")]
+    InsufficientTokens,
+    #[msg("Insufficient SOL")]
+    InsufficientSOL
 }

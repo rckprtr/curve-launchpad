@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-use crate::state::{BondingCurve, Global};
+use crate::{state::{BondingCurve, Global}, CurveSocialError};
 
 #[derive(Accounts)]
 pub struct Buy<'info> {
@@ -45,6 +45,34 @@ pub struct Buy<'info> {
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
     let _global = &mut ctx.accounts.global;
 
+    if ctx.accounts.bonding_curve.complete {
+        return Err(CurveSocialError::BondingCurveComplete.into());
+    }
+
+    let targe_token_amount = if ctx.accounts.bonding_curve_token_account.amount < token_amount {
+        ctx.accounts.bonding_curve_token_account.amount
+    } else {
+        token_amount
+    };
+
+    let value = ctx.accounts.bonding_curve.get_buy_price(targe_token_amount);
+    if value.is_err() {
+        msg!(value.err().unwrap().as_str());
+        return Err(CurveSocialError::InsufficientTokens.into());
+    }
+    let buy_price = value.unwrap();
+
+    if buy_price > max_sol_cost || buy_price == 0 {
+        return Err(CurveSocialError::InsufficientSOL.into());
+    }
+
+    if ctx.accounts.user.lamports() < buy_price {
+        return Err(CurveSocialError::InsufficientSOL.into());
+    }
+    
+    msg!("value of token: {}", buy_price);
+    msg!("max_sol_cost: {}", max_sol_cost);
+
     let from_account = &ctx.accounts.user;
     let to_account = &ctx.accounts.bonding_curve;
 
@@ -52,7 +80,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     let transfer_instruction = system_instruction::transfer(
         from_account.key,
         to_account.to_account_info().key,
-        max_sol_cost,
+        buy_price,
     );
 
     anchor_lang::solana_program::program::invoke_signed(
@@ -76,12 +104,11 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         authority: ctx.accounts.bonding_curve.to_account_info().clone(),
     };
 
-    let seeds = &[
+    let signer: [&[&[u8]]; 1] = [&[
         BondingCurve::SEED_PREFIX,
         ctx.accounts.mint.to_account_info().key.as_ref(),
         &[ctx.bumps.bonding_curve],
-    ];
-    let signer = [&seeds[..]];
+    ]];
 
     token::transfer(
         CpiContext::new_with_signer(
@@ -93,8 +120,12 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     )?;
 
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.real_token_reserve -= token_amount;
-    bonding_curve.real_sol_reserve += max_sol_cost;
+    bonding_curve.real_token_reserves -= targe_token_amount;
+    bonding_curve.real_sol_reserves += buy_price;
+
+    if bonding_curve.real_token_reserves == 0 {
+        bonding_curve.complete = true;
+    }
 
     Ok(())
 }

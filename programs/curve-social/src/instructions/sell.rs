@@ -1,4 +1,4 @@
-use crate::state::{BondingCurve, Global};
+use crate::{state::{BondingCurve, Global}, CurveSocialError};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 #[derive(Accounts)]
@@ -41,6 +41,18 @@ pub struct Sell<'info> {
 }
 
 pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
+    
+    if ctx.accounts.bonding_curve.complete {
+        return Err(CurveSocialError::BondingCurveComplete.into());
+    }
+
+    //confirm user has enough tokens
+    if ctx.accounts.user_token_account.amount < token_amount {
+        return Err(CurveSocialError::InsufficientTokens.into());
+    }
+
+    //buy max tokens at price per token
+    //calculate the amount of SOL to transfer
 
     //transfer SPL
     let cpi_accounts = Transfer {
@@ -71,8 +83,8 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
 
 
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.real_token_reserve += token_amount;
-    bonding_curve.real_sol_reserve -= min_sol_output;
+    bonding_curve.real_token_reserves += token_amount;
+    bonding_curve.real_sol_reserves -= min_sol_output;
 
     Ok(())
 }

@@ -22,10 +22,12 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
 
-const DEFAULT_DECIMALS = 6;
-const DEFAULT_TOKEN_BALANCE = 10000000;
+
 
 describe("curve-social", () => {
+  const DEFAULT_DECIMALS = 6n;
+  const DEFAULT_TOKEN_BALANCE = 1_000_000_0000n * BigInt(10 ** Number(DEFAULT_DECIMALS));
+
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -58,14 +60,14 @@ describe("curve-social", () => {
 
     let fundSigtokenCreator = await connection.requestAirdrop(
       tokenCreator.publicKey,
-      5 * LAMPORTS_PER_SOL
+      90 * LAMPORTS_PER_SOL
     );
 
     await getTxDetails(connection, fundSigtokenCreator);
   });
 
   it("Is initialized!", async () => {
-    const initializeTx = await program.methods
+    await program.methods
       .initialize()
       .accounts({
         authority: authority.publicKey,
@@ -105,7 +107,7 @@ describe("curve-social", () => {
     let symbol = "tst";
     let uri = "https://www.test.com";
 
-    const createTx = await program.methods
+    await program.methods
       .create(name, symbol, uri)
       .accounts({
         mint: mint.publicKey,
@@ -119,20 +121,24 @@ describe("curve-social", () => {
       .signers([mint, tokenCreator])
       .rpc();
 
-      const tokenAmount = await connection.getTokenAccountBalance(bondingCurveTokenAccount);
-      assert.equal(tokenAmount.value.amount, DEFAULT_TOKEN_BALANCE.toString());
+    const tokenAmount = await connection.getTokenAccountBalance(
+      bondingCurveTokenAccount
+    );
+    assert.equal(tokenAmount.value.amount, DEFAULT_TOKEN_BALANCE.toString());
 
-      const createdMint = await getMint(connection, mint.publicKey);
-      assert.equal(createdMint.isInitialized, true);
-      assert.equal(createdMint.decimals, DEFAULT_DECIMALS);
-      assert.equal(createdMint.supply, BigInt(DEFAULT_TOKEN_BALANCE));
-      assert.equal(createdMint.mintAuthority, null);
+    const createdMint = await getMint(connection, mint.publicKey);
+    assert.equal(createdMint.isInitialized, true);
+    assert.equal(createdMint.decimals, Number(DEFAULT_DECIMALS));
+    assert.equal(createdMint.supply, DEFAULT_TOKEN_BALANCE);
+    assert.equal(createdMint.mintAuthority, null);
 
-      const metaplex = Metaplex.make(connection);
-      const token = await metaplex.nfts().findByMint({ mintAddress: mint.publicKey });
-      assert.equal(token.name, name);
-      assert.equal(token.symbol, symbol);
-      assert.equal(token.uri, uri);
+    const metaplex = Metaplex.make(connection);
+    const token = await metaplex
+      .nfts()
+      .findByMint({ mintAddress: mint.publicKey });
+    assert.equal(token.name, name);
+    assert.equal(token.symbol, symbol);
+    assert.equal(token.uri, uri);
   });
 
   it("can buy a token", async () => {
@@ -153,9 +159,12 @@ describe("curve-social", () => {
       mint.publicKey,
       tokenCreator.publicKey
     );
-
-    const buyTx = await program.methods
-      .buy(new BN(1000), new BN(555555))
+  
+    let buySOLAmount = new BN(1 * LAMPORTS_PER_SOL);
+    let buyTokenAmount = new BN(32442896181016);
+    
+    await program.methods
+      .buy(new BN(buyTokenAmount), new BN(buySOLAmount))
       .accounts({
         user: tokenCreator.publicKey,
         global: globalPDA,
@@ -187,7 +196,7 @@ describe("curve-social", () => {
       tokenCreator.publicKey
     );
 
-    const sellTx = await program.methods
+    await program.methods
       .sell(new BN(1000), new BN(1))
       .accounts({
         user: tokenCreator.publicKey,
@@ -202,13 +211,13 @@ describe("curve-social", () => {
   });
 
   it("can set params", async () => {
-    const setParamsTx = await program.methods
+    await program.methods
       .setParams(
         TOKEN_METADATA_PROGRAM_ID,
         new BN(1000),
-        new BN(1000),
-        new BN(1000),
-        new BN(1000),
+        new BN(2000),
+        new BN(3000),
+        new BN(4000),
         new BN(100)
       )
       .accounts({
@@ -230,13 +239,13 @@ describe("curve-social", () => {
     );
     assert.equal(
       global.initialVirtualSolReserves.toString(),
-      new BN(1000).toString()
+      new BN(2000).toString()
     );
     assert.equal(
       global.initialRealTokenReserves.toString(),
-      new BN(1000).toString()
+      new BN(3000).toString()
     );
-    assert.equal(global.initialTokenSupply.toString(), new BN(1000).toString());
+    assert.equal(global.initialTokenSupply.toString(), new BN(4000).toString());
     assert.equal(global.feeBasisPoints.toString(), new BN(100).toString());
   });
 });

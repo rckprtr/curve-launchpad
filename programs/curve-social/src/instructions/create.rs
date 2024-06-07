@@ -127,10 +127,10 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     token::set_authority(cpi_context, AuthorityType::MintTokens, None)?;
     
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.virtual_sol_reserve = 0;
-    bonding_curve.virtual_token_reserve = 0;
-    bonding_curve.real_sol_reserve = 0;
-    bonding_curve.real_token_reserve = ctx.accounts.global.initial_token_supply;
+    bonding_curve.virtual_sol_reserves = ctx.accounts.global.initial_virtual_sol_reserves;
+    bonding_curve.virtual_token_reserves = ctx.accounts.global.initial_virtual_token_reserves;
+    bonding_curve.real_sol_reserves = 0;
+    bonding_curve.real_token_reserves = ctx.accounts.global.initial_token_supply;
     bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
     bonding_curve.complete = false;
   
