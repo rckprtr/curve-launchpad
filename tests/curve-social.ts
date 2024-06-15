@@ -22,7 +22,7 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
 
-
+import IDL from "../target/idl/curve_social.json";
 
 describe("curve-social", () => {
   const DEFAULT_DECIMALS = 6n;
@@ -31,6 +31,10 @@ describe("curve-social", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+
+  let newProgram = new Program<CurveSocial>(IDL as any);
+
+  //newProgram.account.
 
   const program = anchor.workspace.CurveSocial as Program<CurveSocial>;
 
@@ -71,7 +75,6 @@ describe("curve-social", () => {
       .initialize()
       .accounts({
         authority: authority.publicKey,
-        global: globalPDA,
       })
       .signers([authority])
       .rpc();
@@ -112,11 +115,9 @@ describe("curve-social", () => {
       .accounts({
         mint: mint.publicKey,
         creator: tokenCreator.publicKey,
-        mintAuthority: mintAuthorityPDA,
-        bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
-        global: globalPDA,
         metadata: metadataPDA,
+        program: program.programId,
       })
       .signers([mint, tokenCreator])
       .rpc();
@@ -167,9 +168,7 @@ describe("curve-social", () => {
       .buy(new BN(buyTokenAmount), new BN(buySOLAmount))
       .accounts({
         user: tokenCreator.publicKey,
-        global: globalPDA,
         mint: mint.publicKey,
-        bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
       })
@@ -200,9 +199,7 @@ describe("curve-social", () => {
       .sell(new BN(1000), new BN(1))
       .accounts({
         user: tokenCreator.publicKey,
-        global: globalPDA,
         mint: mint.publicKey,
-        bondingCurve: bondingCurvePDA,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
       })
@@ -222,7 +219,6 @@ describe("curve-social", () => {
       )
       .accounts({
         user: authority.publicKey,
-        global: globalPDA,
       })
       .signers([authority])
       .rpc();

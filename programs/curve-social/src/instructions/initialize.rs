@@ -1,4 +1,4 @@
-use crate::{state::Global, CurveSocialError};
+use crate::{state::Global, CurveSocialError, DEFAULT_TOKEN_SUPPLY};
 use anchor_lang::prelude::*;
 
 
@@ -29,9 +29,9 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
 
     global.authority = *ctx.accounts.authority.to_account_info().key;
     global.initialized = true;
-    global.initial_token_supply = 1_000_000_0000 * (10 as u64).pow(6);
+    global.initial_token_supply = DEFAULT_TOKEN_SUPPLY;
     global.initial_real_sol_reserves = 0;
-    global.initial_real_token_reserves = 1_000_000_0000 * (10 as u64).pow(6);
+    global.initial_real_token_reserves = DEFAULT_TOKEN_SUPPLY;
     global.initial_virtual_sol_reserves = 0;
     global.initial_virtual_token_reserves = 1_073_000_000_000_000;
 

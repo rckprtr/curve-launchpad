@@ -1,7 +1,7 @@
 use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
-use crate::{state::{BondingCurve, Global}, CurveSocialError};
+use crate::{amm, state::{global, BondingCurve, Global}, CurveSocialError};
 
 #[derive(Accounts)]
 pub struct Buy<'info> {
@@ -55,12 +55,16 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         token_amount
     };
 
-    let value = ctx.accounts.bonding_curve.get_buy_price(targe_token_amount);
-    if value.is_err() {
-        msg!(value.err().unwrap().as_str());
-        return Err(CurveSocialError::InsufficientTokens.into());
-    }
-    let buy_price = value.unwrap();
+    let amm = amm::amm::AMM::new(
+        ctx.accounts.bonding_curve.virtual_sol_reserves,
+        ctx.accounts.bonding_curve.virtual_token_reserves,
+        ctx.accounts.bonding_curve.real_sol_reserves,
+        ctx.accounts.bonding_curve.real_token_reserves,
+        ctx.accounts.global.initial_virtual_token_reserves
+    );
+
+
+    let buy_price = amm.get_buy_price(targe_token_amount);
 
     if buy_price > max_sol_cost || buy_price == 0 {
         return Err(CurveSocialError::InsufficientSOL.into());

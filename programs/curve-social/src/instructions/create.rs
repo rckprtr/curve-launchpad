@@ -11,6 +11,7 @@ use anchor_spl::{
 };
 use crate::state::{BondingCurve, Global};
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct Create<'info> {
     #[account(
@@ -70,15 +71,25 @@ pub struct Create<'info> {
     rent: Sysvar<'info, Rent>,
 }
 
+#[event]
+pub struct CreateEvent {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub mint: Pubkey,
+    pub bonding_curve: Pubkey,
+    pub creator: Pubkey,
+}
+
 pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
 
     let seeds = &["mint-authority".as_bytes(), &[ctx.bumps.mint_authority]];
     let signer = [&seeds[..]];
 
     let token_data: DataV2 = DataV2 {
-        name: name,
-        symbol: symbol,
-        uri: uri,
+        name: name.clone(),
+        symbol: symbol.clone(),
+        uri: uri.clone(),
         seller_fee_basis_points: 0,
         creators: None,
         collection: None,
@@ -133,6 +144,15 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     bonding_curve.real_token_reserves = ctx.accounts.global.initial_token_supply;
     bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
     bonding_curve.complete = false;
+
+    emit_cpi!(CreateEvent {
+        name,
+        symbol,
+        uri,
+        mint: *ctx.accounts.mint.to_account_info().key,
+        bonding_curve: *ctx.accounts.bonding_curve.to_account_info().key,
+        creator: *ctx.accounts.creator.to_account_info().key,
+    });
   
     Ok(())
 }
