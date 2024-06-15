@@ -1,5 +1,4 @@
 use std::fmt;
-use crate::state::BondingCurve;
 
 #[derive(Debug)]
 pub struct AMM {
