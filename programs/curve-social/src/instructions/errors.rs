@@ -14,5 +14,9 @@ pub enum CurveSocialError {
     #[msg("Insufficient Tokens")]
     InsufficientTokens,
     #[msg("Insufficient SOL")]
-    InsufficientSOL
+    InsufficientSOL,
+    #[msg("Max SOL Cost Exceeded")]
+    MaxSOLCostExceeded,
+    #[msg("Min SOL Output Exceeded")]
+    MinSOLOutputExceeded,
 }

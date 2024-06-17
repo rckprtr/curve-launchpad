@@ -1,12 +1,23 @@
 use std::fmt;
 
+
+pub struct BuyResult {
+    pub token_amount: u64,
+    pub sol_amount: u64,
+}
+
+pub struct SellResult {
+    pub token_amount: u64,
+    pub sol_amount: u64,
+}
+
 #[derive(Debug)]
 pub struct AMM {
-    virtual_sol_reserves: u64,
-    virtual_token_reserves: u64,
-    real_sol_reserves: u64,
-    real_token_reserves: u64,
-    inital_virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u64,
+    pub virtual_token_reserves: u64,
+    pub real_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub inital_virtual_token_reserves: u64,
 }
 
 impl AMM {
@@ -39,7 +50,14 @@ impl AMM {
         if amount_needed > 0 { amount_needed } else { 0 }
     }
 
-    pub fn apply_buy(&mut self, token_amount: u64) {
+    pub fn apply_buy(&mut self, token_amount: u64) -> BuyResult {
+
+        let final_token_amount = if token_amount > self.real_token_reserves {
+            self.real_token_reserves
+        } else {
+            token_amount
+        };
+
         let sol_amount = self.get_buy_price(token_amount);
 
         self.virtual_token_reserves = self.virtual_token_reserves.saturating_sub(token_amount);
@@ -47,9 +65,14 @@ impl AMM {
 
         self.virtual_sol_reserves = self.virtual_sol_reserves.saturating_add(sol_amount);
         self.real_sol_reserves = self.real_sol_reserves.saturating_add(sol_amount);
+
+        BuyResult {
+            token_amount: final_token_amount,
+            sol_amount,
+        }
     }
 
-    pub fn apply_sell(&mut self, token_amount: u64) {
+    pub fn apply_sell(&mut self, token_amount: u64) -> SellResult {
         self.virtual_token_reserves = self.virtual_token_reserves.saturating_add(token_amount);
         self.real_token_reserves = self.real_token_reserves.saturating_add(token_amount);
 
@@ -57,6 +80,11 @@ impl AMM {
 
         self.virtual_sol_reserves = self.virtual_sol_reserves.saturating_sub(sell_price);
         self.real_sol_reserves = self.real_sol_reserves.saturating_sub(sell_price);
+
+        SellResult {
+            token_amount,
+            sol_amount: sell_price,
+        }
     }
 
     pub fn get_sell_price(&self, tokens: u64) -> u64 {

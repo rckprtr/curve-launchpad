@@ -23,9 +23,10 @@ pub struct Initialize<'info> {
 pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     let global = &mut ctx.accounts.global;
 
-    if global.initialized {
-        return Err(CurveSocialError::AlreadyInitialized.into());
-    }
+    require!(
+        global.initialized == true,
+        CurveSocialError::AlreadyInitialized,
+    );
 
     global.authority = *ctx.accounts.authority.to_account_info().key;
     global.initialized = true;

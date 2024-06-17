@@ -26,13 +26,17 @@ pub fn set_params(
 ) -> Result<()> {
     let global = &mut ctx.accounts.global;
 
-    if global.authority != *ctx.accounts.user.to_account_info().key {
-        return Err(CurveSocialError::InvalidAuthority.into());
-    }
+    //confirm program is initialized
+    require!(
+        global.initialized == false,
+        CurveSocialError::NotInitialized
+    );
 
-    if !global.initialized {
-        return Err(CurveSocialError::NotInitialized.into());
-    }
+    //confirm user is the authority
+    require!(
+        global.authority != *ctx.accounts.user.to_account_info().key,
+        CurveSocialError::InvalidAuthority
+    );
     
     global.fee_recipient = fee_recipient;
     global.initial_virtual_token_reserves = initial_virtual_token_reserves;

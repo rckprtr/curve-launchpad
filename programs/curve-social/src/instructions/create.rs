@@ -9,7 +9,7 @@ use anchor_spl::{
         self, mint_to, spl_token::instruction::AuthorityType, Mint, MintTo, Token, TokenAccount,
     },
 };
-use crate::state::{BondingCurve, Global};
+use crate::{state::{BondingCurve, Global}, CurveSocialError};
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -82,6 +82,12 @@ pub struct CreateEvent {
 }
 
 pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
+
+     //confirm program is initialized
+     require!(
+        ctx.accounts.global.initialized == false,
+        CurveSocialError::NotInitialized
+    );
 
     let seeds = &["mint-authority".as_bytes(), &[ctx.bumps.mint_authority]];
     let signer = [&seeds[..]];

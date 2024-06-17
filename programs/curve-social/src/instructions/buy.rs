@@ -49,9 +49,17 @@ pub struct Buy<'info> {
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
     let _global = &mut ctx.accounts.global;
 
-    if ctx.accounts.bonding_curve.complete {
-        return Err(CurveSocialError::BondingCurveComplete.into());
-    }
+    //bonding curve is not complete
+    require!(
+        ctx.accounts.bonding_curve.complete == false,
+        CurveSocialError::BondingCurveComplete,
+    );
+
+    //user token account has enough tokens
+    require!(
+        ctx.accounts.user_token_account.amount < token_amount,
+        CurveSocialError::InsufficientTokens,
+    );
 
     let targe_token_amount = if ctx.accounts.bonding_curve_token_account.amount < token_amount {
         ctx.accounts.bonding_curve_token_account.amount
@@ -59,7 +67,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         token_amount
     };
 
-    let amm = amm::amm::AMM::new(
+    let mut amm = amm::amm::AMM::new(
         ctx.accounts.bonding_curve.virtual_sol_reserves,
         ctx.accounts.bonding_curve.virtual_token_reserves,
         ctx.accounts.bonding_curve.real_sol_reserves,
@@ -67,18 +75,19 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.global.initial_virtual_token_reserves,
     );
 
-    let buy_price = amm.get_buy_price(targe_token_amount);
+    let buy_result = amm.apply_buy(targe_token_amount);
 
-    if buy_price > max_sol_cost || buy_price == 0 {
-        return Err(CurveSocialError::InsufficientSOL.into());
-    }
+    //check if the amount of SOL to transfer is less than the max_sol_cost
+    require!(
+        buy_result.sol_amount > max_sol_cost,
+        CurveSocialError::MaxSOLCostExceeded,
+    );
 
-    if ctx.accounts.user.lamports() < buy_price {
-        return Err(CurveSocialError::InsufficientSOL.into());
-    }
-
-    msg!("value of token: {}", buy_price);
-    msg!("max_sol_cost: {}", max_sol_cost);
+    //check if the user has enough SOL
+    require!(
+        ctx.accounts.user.lamports() < buy_result.sol_amount,
+        CurveSocialError::InsufficientSOL,
+    );
 
     let from_account = &ctx.accounts.user;
     let to_account = &ctx.accounts.bonding_curve;
@@ -87,7 +96,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     let transfer_instruction = system_instruction::transfer(
         from_account.key,
         to_account.to_account_info().key,
-        buy_price,
+        buy_result.sol_amount,
     );
 
     anchor_lang::solana_program::program::invoke_signed(
@@ -123,12 +132,15 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
             cpi_accounts,
             &signer,
         ),
-        token_amount,
+        buy_result.token_amount,
     )?;
 
+    //apply the buy to the bonding curve
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.real_token_reserves -= targe_token_amount;
-    bonding_curve.real_sol_reserves += buy_price;
+    bonding_curve.real_token_reserves = amm.real_token_reserves;
+    bonding_curve.real_sol_reserves = amm.real_sol_reserves;
+    bonding_curve.virtual_token_reserves = amm.virtual_token_reserves;
+    bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves;
 
     if bonding_curve.real_token_reserves == 0 {
         bonding_curve.complete = true;
