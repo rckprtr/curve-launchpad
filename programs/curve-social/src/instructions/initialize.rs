@@ -24,7 +24,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     let global = &mut ctx.accounts.global;
 
     require!(
-        global.initialized == true,
+        !global.initialized,
         CurveSocialError::AlreadyInitialized,
     );
 

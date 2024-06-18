@@ -85,7 +85,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
 
      //confirm program is initialized
      require!(
-        ctx.accounts.global.initialized == false,
+        ctx.accounts.global.initialized,
         CurveSocialError::NotInitialized
     );
 

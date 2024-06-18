@@ -1,4 +1,8 @@
-use crate::{amm, state::{BondingCurve, Global}, CurveSocialError};
+use crate::{
+    amm,
+    state::{BondingCurve, Global},
+    CurveSocialError,
+};
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 #[derive(Accounts)]
@@ -41,38 +45,39 @@ pub struct Sell<'info> {
 }
 
 pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
-    
     //check if bonding curve is complete
     require!(
-        ctx.accounts.bonding_curve.complete == true,
+        !ctx.accounts.bonding_curve.complete,
         CurveSocialError::BondingCurveComplete,
     );
 
     //confirm user has enough tokens
     require!(
-        ctx.accounts.user_token_account.amount < token_amount,
+        ctx.accounts.user_token_account.amount >= token_amount,
         CurveSocialError::InsufficientTokens,
     );
 
     //confirm bonding curve has enough tokens
     require!(
-        ctx.accounts.bonding_curve_token_account.amount < token_amount,
+        ctx.accounts.bonding_curve_token_account.amount >= token_amount,
         CurveSocialError::InsufficientTokens,
     );
 
     let mut amm = amm::amm::AMM::new(
-        ctx.accounts.bonding_curve.virtual_sol_reserves,
-        ctx.accounts.bonding_curve.virtual_token_reserves,
-        ctx.accounts.bonding_curve.real_sol_reserves,
-        ctx.accounts.bonding_curve.real_token_reserves,
-        ctx.accounts.global.initial_virtual_token_reserves,
+        ctx.accounts.bonding_curve.virtual_sol_reserves as u128,
+        ctx.accounts.bonding_curve.virtual_token_reserves as u128,
+        ctx.accounts.bonding_curve.real_sol_reserves as u128,
+        ctx.accounts.bonding_curve.real_token_reserves as u128,
+        ctx.accounts.global.initial_virtual_token_reserves as u128,
     );
 
-    let sell_result = amm.apply_sell(token_amount);
+    msg!("{}", amm);
+
+    let sell_result = amm.apply_sell(token_amount as u128);
 
     //confirm min sol output is greater than sol output
     require!(
-        sell_result.sol_amount < min_sol_output,
+        sell_result.sol_amount >= min_sol_output,
         CurveSocialError::MinSOLOutputExceeded,
     );
 
@@ -100,16 +105,15 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
     //TODO: check if this is correct
     let from_account = &ctx.accounts.bonding_curve;
     let to_account = &ctx.accounts.user;
-    
+
     **from_account.to_account_info().try_borrow_mut_lamports()? -= sell_result.sol_amount;
     **to_account.try_borrow_mut_lamports()? += sell_result.sol_amount;
 
-
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.real_token_reserves = amm.real_token_reserves;
-    bonding_curve.real_sol_reserves = amm.real_sol_reserves;
-    bonding_curve.virtual_token_reserves = amm.virtual_token_reserves;
-    bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves;
+    bonding_curve.real_token_reserves = amm.real_token_reserves as u64;
+    bonding_curve.real_sol_reserves = amm.real_sol_reserves as u64;
+    bonding_curve.virtual_token_reserves = amm.virtual_token_reserves as u64;
+    bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves as u64;
 
     Ok(())
 }

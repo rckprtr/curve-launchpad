@@ -57,7 +57,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
 
     //user token account has enough tokens
     require!(
-        ctx.accounts.user_token_account.amount < token_amount,
+        ctx.accounts.user_token_account.amount <= token_amount,
         CurveSocialError::InsufficientTokens,
     );
 
@@ -68,24 +68,24 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     };
 
     let mut amm = amm::amm::AMM::new(
-        ctx.accounts.bonding_curve.virtual_sol_reserves,
-        ctx.accounts.bonding_curve.virtual_token_reserves,
-        ctx.accounts.bonding_curve.real_sol_reserves,
-        ctx.accounts.bonding_curve.real_token_reserves,
-        ctx.accounts.global.initial_virtual_token_reserves,
+        ctx.accounts.bonding_curve.virtual_sol_reserves as u128,
+        ctx.accounts.bonding_curve.virtual_token_reserves as u128,
+        ctx.accounts.bonding_curve.real_sol_reserves as u128,
+        ctx.accounts.bonding_curve.real_token_reserves as u128,
+        ctx.accounts.global.initial_virtual_token_reserves as u128,
     );
 
-    let buy_result = amm.apply_buy(targe_token_amount);
+    let buy_result = amm.apply_buy(targe_token_amount as u128);
 
     //check if the amount of SOL to transfer is less than the max_sol_cost
     require!(
-        buy_result.sol_amount > max_sol_cost,
+        buy_result.sol_amount <= max_sol_cost,
         CurveSocialError::MaxSOLCostExceeded,
     );
 
     //check if the user has enough SOL
     require!(
-        ctx.accounts.user.lamports() < buy_result.sol_amount,
+        ctx.accounts.user.lamports() >= buy_result.sol_amount,
         CurveSocialError::InsufficientSOL,
     );
 
@@ -137,10 +137,10 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
 
     //apply the buy to the bonding curve
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.real_token_reserves = amm.real_token_reserves;
-    bonding_curve.real_sol_reserves = amm.real_sol_reserves;
-    bonding_curve.virtual_token_reserves = amm.virtual_token_reserves;
-    bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves;
+    bonding_curve.real_token_reserves = amm.real_token_reserves as u64;
+    bonding_curve.real_sol_reserves = amm.real_sol_reserves as u64;
+    bonding_curve.virtual_token_reserves = amm.virtual_token_reserves as u64;
+    bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves as u64;
 
     if bonding_curve.real_token_reserves == 0 {
         bonding_curve.complete = true;

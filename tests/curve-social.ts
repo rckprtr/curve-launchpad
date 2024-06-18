@@ -162,7 +162,7 @@ describe("curve-social", () => {
     );
   
     let buySOLAmount = new BN(1 * LAMPORTS_PER_SOL);
-    let buyTokenAmount = new BN(32442896181016);
+    let buyTokenAmount = new BN(100000000);
     
     await program.methods
       .buy(new BN(buyTokenAmount), new BN(buySOLAmount))
@@ -196,7 +196,7 @@ describe("curve-social", () => {
     );
 
     await program.methods
-      .sell(new BN(1000), new BN(1))
+      .sell(new BN(10000000), new BN(0))
       .accounts({
         user: tokenCreator.publicKey,
         mint: mint.publicKey,

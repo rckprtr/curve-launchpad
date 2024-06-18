@@ -13,20 +13,20 @@ pub struct SellResult {
 
 #[derive(Debug)]
 pub struct AMM {
-    pub virtual_sol_reserves: u64,
-    pub virtual_token_reserves: u64,
-    pub real_sol_reserves: u64,
-    pub real_token_reserves: u64,
-    pub inital_virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u128,
+    pub virtual_token_reserves: u128,
+    pub real_sol_reserves: u128,
+    pub real_token_reserves: u128,
+    pub inital_virtual_token_reserves: u128,
 }
 
 impl AMM {
     pub fn new(
-        virtual_sol_reserves: u64,
-        virtual_token_reserves: u64,
-        real_sol_reserves: u64,
-        real_token_reserves: u64,
-        inital_virtual_token_reserves: u64,
+        virtual_sol_reserves: u128,
+        virtual_token_reserves: u128,
+        real_sol_reserves: u128,
+        real_token_reserves: u128,
+        inital_virtual_token_reserves: u128,
     ) -> Self {
         AMM {
             virtual_sol_reserves,
@@ -37,7 +37,7 @@ impl AMM {
         }
     }
 
-    pub fn get_buy_price(&self, tokens: u64) -> u64 {
+    pub fn get_buy_price(&self, tokens: u128) -> u128 {
         if tokens <= 0 {
             return 0;
         }
@@ -50,7 +50,7 @@ impl AMM {
         if amount_needed > 0 { amount_needed } else { 0 }
     }
 
-    pub fn apply_buy(&mut self, token_amount: u64) -> BuyResult {
+    pub fn apply_buy(&mut self, token_amount: u128) -> BuyResult {
 
         let final_token_amount = if token_amount > self.real_token_reserves {
             self.real_token_reserves
@@ -67,12 +67,12 @@ impl AMM {
         self.real_sol_reserves = self.real_sol_reserves.saturating_add(sol_amount);
 
         BuyResult {
-            token_amount: final_token_amount,
-            sol_amount,
+            token_amount: final_token_amount as u64,
+            sol_amount: sol_amount as u64,
         }
     }
 
-    pub fn apply_sell(&mut self, token_amount: u64) -> SellResult {
+    pub fn apply_sell(&mut self, token_amount: u128) -> SellResult {
         self.virtual_token_reserves = self.virtual_token_reserves.saturating_add(token_amount);
         self.real_token_reserves = self.real_token_reserves.saturating_add(token_amount);
 
@@ -82,19 +82,21 @@ impl AMM {
         self.real_sol_reserves = self.real_sol_reserves.saturating_sub(sell_price);
 
         SellResult {
-            token_amount,
-            sol_amount: sell_price,
+            token_amount: token_amount as u64,
+            sol_amount: sell_price as u64,
         }
     }
 
-    pub fn get_sell_price(&self, tokens: u64) -> u64 {
+    pub fn get_sell_price(&self, tokens: u128) -> u128 {
         if tokens <= 0 {
             return 0;
         }
 
         let scaling_factor = self.inital_virtual_token_reserves;
 
-        let token_sell_proportion = (tokens * scaling_factor) / self.virtual_token_reserves;
+        let scaled_tokens = tokens * scaling_factor;
+
+        let token_sell_proportion = scaled_tokens / self.virtual_token_reserves;
         let sol_received = (self.virtual_sol_reserves * token_sell_proportion) / scaling_factor;
 
         if sol_received < self.real_sol_reserves {

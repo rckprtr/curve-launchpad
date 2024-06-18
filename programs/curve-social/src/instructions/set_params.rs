@@ -28,13 +28,13 @@ pub fn set_params(
 
     //confirm program is initialized
     require!(
-        global.initialized == false,
+        global.initialized,
         CurveSocialError::NotInitialized
     );
 
     //confirm user is the authority
     require!(
-        global.authority != *ctx.accounts.user.to_account_info().key,
+        global.authority == *ctx.accounts.user.to_account_info().key,
         CurveSocialError::InvalidAuthority
     );
     
