@@ -50,11 +50,6 @@ describe("curve-social", () => {
     program.programId
   );
 
-  const [mintAuthorityPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from(MINT_AUTHORITY_SEED)],
-    program.programId
-  );
-
   const simpleBuy = async (
     user: anchor.web3.Keypair,
     tokenAmount: bigint,
@@ -401,14 +396,5 @@ describe("curve-social", () => {
 // test buy whole curve
 // test sell whole curve
 
-// test buy errors
-// buy error: bonding curve not initialized
-
-// test sell errors
-// sell error: bonding curve not initialized
-
 // test set params errors
 // set params error: not authority
-// set params error: bonding curve not initialized
-// test create errors
-// create error: bonding curve not initialized

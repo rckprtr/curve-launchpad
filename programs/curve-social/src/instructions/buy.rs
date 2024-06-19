@@ -52,7 +52,6 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.global.initialized,
         CurveSocialError::NotInitialized
     );
-    msg!("global: {:?}", ctx.accounts.global.initialized);
 
     //bonding curve is not complete
     require!(
@@ -86,9 +85,6 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     );
 
     let buy_result = amm.apply_buy(targe_token_amount as u128);
-
-    //msg buy result
-    msg!("buy_result: sol_amount: {:?} token_amount: {:?}", buy_result.sol_amount, buy_result.token_amount);
 
     //check if the amount of SOL to transfer is less than the max_sol_cost
     require!(

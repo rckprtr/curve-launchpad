@@ -76,8 +76,6 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
         ctx.accounts.global.initial_virtual_token_reserves as u128,
     );
 
-    msg!("{}", amm);
-
     let sell_result = amm.apply_sell(token_amount as u128);
 
     //confirm min sol output is greater than sol output
