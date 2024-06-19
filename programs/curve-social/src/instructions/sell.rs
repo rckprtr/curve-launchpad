@@ -63,6 +63,11 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
         CurveSocialError::InsufficientTokens,
     );
 
+    require!(
+        token_amount > 0,
+        CurveSocialError::MinSell,
+    );
+
     let mut amm = amm::amm::AMM::new(
         ctx.accounts.bonding_curve.virtual_sol_reserves as u128,
         ctx.accounts.bonding_curve.virtual_token_reserves as u128,

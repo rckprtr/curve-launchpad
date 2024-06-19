@@ -19,4 +19,8 @@ pub enum CurveSocialError {
     MaxSOLCostExceeded,
     #[msg("Min SOL Output Exceeded")]
     MinSOLOutputExceeded,
+    #[msg("Min buy is 1 Token")]
+    MinBuy,
+    #[msg("Min sell is 1 Token")]
+    MinSell,
 }

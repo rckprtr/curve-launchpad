@@ -12,7 +12,7 @@ import {
 } from "@solana/spl-token";
 import { BN } from "bn.js";
 import { assert } from "chai";
-import { Metaplex } from "@metaplex-foundation/js";
+import { Metaplex, token } from "@metaplex-foundation/js";
 
 const GLOBAL_SEED = "global";
 const METADATA_SEED = "metadata";
@@ -54,6 +54,76 @@ describe("curve-social", () => {
     [Buffer.from(MINT_AUTHORITY_SEED)],
     program.programId
   );
+
+  const simpleBuy = async (
+    user: anchor.web3.Keypair,
+    tokenAmount: bigint,
+    maxSolAmount: bigint
+  ) => {
+    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
+      mint.publicKey,
+      bondingCurvePDA,
+      true
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      user,
+      mint.publicKey,
+      user.publicKey
+    );
+
+    return program.methods
+      .buy(new BN(tokenAmount.toString()), new BN(maxSolAmount.toString()))
+      .accounts({
+        user: user.publicKey,
+        mint: mint.publicKey,
+        bondingCurveTokenAccount: bondingCurveTokenAccount,
+        userTokenAccount: userTokenAccount.address,
+      })
+      .signers([user])
+      .rpc();
+  };
+
+  const simpleSell = async (
+    user: anchor.web3.Keypair,
+    tokenAmount: bigint,
+    minSolAmount: bigint
+  ) => {
+    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
+      program.programId
+    );
+
+    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
+      mint.publicKey,
+      bondingCurvePDA,
+      true
+    );
+
+    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
+      connection,
+      user,
+      mint.publicKey,
+      user.publicKey
+    );
+
+    return program.methods
+      .sell(new BN(tokenAmount.toString()), new BN(minSolAmount.toString()))
+      .accounts({
+        user: user.publicKey,
+        mint: mint.publicKey,
+        bondingCurveTokenAccount: bondingCurveTokenAccount,
+        userTokenAccount: userTokenAccount.address,
+      })
+      .signers([user])
+      .rpc();
+  };
 
   before(async () => {
     await fundAccountSOL(connection, authority.publicKey, 5 * LAMPORTS_PER_SOL);
@@ -200,6 +270,8 @@ describe("curve-social", () => {
       })
       .signers([tokenCreator])
       .rpc();
+
+      await simpleSell(tokenCreator, 10000000n, 0n);
   });
 
   it("can't buy a token, not enough SOL", async () => {
@@ -211,157 +283,79 @@ describe("curve-social", () => {
       0.021 * LAMPORTS_PER_SOL
     );
 
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      notEnoughSolUser,
-      mint.publicKey,
-      notEnoughSolUser.publicKey
-    );
-
-    let buySOLAmount = new BN(5 * LAMPORTS_PER_SOL);
-    let buyTokenAmount = new BN(5_000_000_000_000);
-
+    let errorCode = "";
     try {
-      await program.methods
-        .buy(new BN(buyTokenAmount), new BN(buySOLAmount))
-        .accounts({
-          user: notEnoughSolUser.publicKey,
-          mint: mint.publicKey,
-          bondingCurveTokenAccount: bondingCurveTokenAccount,
-          userTokenAccount: userTokenAccount.address,
-        })
-        .signers([notEnoughSolUser])
-        .rpc();
+      await simpleBuy(
+        notEnoughSolUser,
+        5_000_000_000_000n,
+        BigInt(5 * LAMPORTS_PER_SOL)
+      );
     } catch (err) {
       if (err instanceof anchor.AnchorError) {
-        assert.equal(err.error.errorCode.code, "InsufficientSOL");
+        errorCode = err.error.errorCode.code;
       }
     }
+    assert.equal(errorCode, "InsufficientSOL");
   });
 
-  it("can buy a token, exceed max sol", async () => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const bondingCurveTokenAccount = await getAssociatedTokenAddressSync(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      tokenCreator,
-      mint.publicKey,
-      tokenCreator.publicKey
-    );
-
-    let buyMaxSOLAmount = new BN(1);
-    let buyTokenAmount = new BN((DEFAULT_TOKEN_BALANCE / 100n).toString());
-
+  it("can't buy a token, exceed max sol", async () => {
+    let errorCode = "";
     try {
-      await program.methods
-        .buy(new BN(buyTokenAmount), new BN(buyMaxSOLAmount))
-        .accounts({
-          user: tokenCreator.publicKey,
-          mint: mint.publicKey,
-          bondingCurveTokenAccount: bondingCurveTokenAccount,
-          userTokenAccount: userTokenAccount.address,
-        })
-        .signers([tokenCreator])
-        .rpc();
+      await simpleBuy(tokenCreator, DEFAULT_TOKEN_BALANCE / 100n, 1n);
     } catch (err) {
       if (err instanceof anchor.AnchorError) {
-        assert.equal(err.error.errorCode.code, "MaxSOLCostExceeded");
+        errorCode = err.error.errorCode.code;
       }
     }
+    assert.equal(errorCode, "MaxSOLCostExceeded");
+  });
+
+  it("can't buy 0 tokens", async () => {
+    let errorCode = "";
+    try {
+      await simpleBuy(tokenCreator, 0n, 1n);
+    } catch (err) {
+      if (err instanceof anchor.AnchorError) {
+        errorCode = err.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "MinBuy");
   });
 
   it("can't sell a token, not enough tokens", async () => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      tokenCreator,
-      mint.publicKey,
-      tokenCreator.publicKey
-    );
-
+    let errorCode = "";
     try {
-      await program.methods
-        .sell(new BN(DEFAULT_TOKEN_BALANCE.toString()), new BN(0))
-        .accounts({
-          user: tokenCreator.publicKey,
-          mint: mint.publicKey,
-          bondingCurveTokenAccount: bondingCurveTokenAccount,
-          userTokenAccount: userTokenAccount.address,
-        })
-        .signers([tokenCreator])
-        .rpc();
+      await simpleSell(tokenCreator, DEFAULT_TOKEN_BALANCE, 0n);
     } catch (err) {
       if (err instanceof anchor.AnchorError) {
-        assert.equal(err.error.errorCode.code, "InsufficientTokens");
+        errorCode = err.error.errorCode.code;
       }
     }
+    assert.equal(errorCode, "InsufficientTokens");
+  });
+
+  it("can't sell 0 tokens", async () => {
+    let errorCode = "";
+    try {
+      await simpleSell(tokenCreator, 0n, 0n);
+    } catch (err) {
+      if (err instanceof anchor.AnchorError) {
+        errorCode = err.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "MinSell");
   });
 
   it("can't sell a token, exceed mint sol sell", async () => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
-    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      tokenCreator,
-      mint.publicKey,
-      tokenCreator.publicKey
-    );
-
+    let errorCode = "";
     try {
-      await program.methods
-        .sell(new BN(1), new BN(DEFAULT_TOKEN_BALANCE.toString()))
-        .accounts({
-          user: tokenCreator.publicKey,
-          mint: mint.publicKey,
-          bondingCurveTokenAccount: bondingCurveTokenAccount,
-          userTokenAccount: userTokenAccount.address,
-        })
-        .signers([tokenCreator])
-        .rpc();
+      await simpleSell(tokenCreator, 1n, DEFAULT_TOKEN_BALANCE);
     } catch (err) {
       if (err instanceof anchor.AnchorError) {
-        assert.equal(err.error.errorCode.code, "MinSOLOutputExceeded");
+        errorCode = err.error.errorCode.code;
       }
     }
+    assert.equal(errorCode, "MinSOLOutputExceeded");
   });
 
   it("can set params", async () => {
@@ -406,12 +400,13 @@ describe("curve-social", () => {
 //TODO: Tests
 // test buy whole curve
 // test sell whole curve
-// test buy 0 tokens
-// test sell 0 tokens
+
 // test buy errors
 // buy error: bonding curve not initialized
+
 // test sell errors
 // sell error: bonding curve not initialized
+
 // test set params errors
 // set params error: not authority
 // set params error: bonding curve not initialized

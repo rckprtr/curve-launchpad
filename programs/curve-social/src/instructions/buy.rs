@@ -47,7 +47,12 @@ pub struct Buy<'info> {
 }
 
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
-    let _global = &mut ctx.accounts.global;
+
+    require!(
+        ctx.accounts.global.initialized,
+        CurveSocialError::NotInitialized
+    );
+    msg!("global: {:?}", ctx.accounts.global.initialized);
 
     //bonding curve is not complete
     require!(
@@ -61,13 +66,16 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         CurveSocialError::InsufficientTokens,
     );
 
+    require!(
+        token_amount > 0,
+        CurveSocialError::MinBuy,
+    );
+
     let targe_token_amount = if ctx.accounts.bonding_curve_token_account.amount < token_amount {
         ctx.accounts.bonding_curve_token_account.amount
     } else {
         token_amount
     };
-
-    msg!("CurrentBonding Curve: {}", ctx.accounts.bonding_curve.to_string());
 
     let mut amm = amm::amm::AMM::new(
         ctx.accounts.bonding_curve.virtual_sol_reserves as u128,
@@ -78,6 +86,9 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     );
 
     let buy_result = amm.apply_buy(targe_token_amount as u128);
+
+    //msg buy result
+    msg!("buy_result: sol_amount: {:?} token_amount: {:?}", buy_result.sol_amount, buy_result.token_amount);
 
     //check if the amount of SOL to transfer is less than the max_sol_cost
     require!(
@@ -90,9 +101,6 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.user.lamports() >= buy_result.sol_amount,
         CurveSocialError::InsufficientSOL,
     );
-    msg!("ctx.accounts.user.lamports(): {}", ctx.accounts.user.lamports());
-    msg!("buy_result.sol_amount: {}", buy_result.sol_amount);
-
 
     let from_account = &ctx.accounts.user;
     let to_account = &ctx.accounts.bonding_curve;
