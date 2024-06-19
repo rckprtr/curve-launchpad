@@ -176,7 +176,6 @@ describe("curve-social", () => {
         mint: mint.publicKey,
         creator: tokenCreator.publicKey,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
-        metadata: metadataPDA,
         program: program.programId,
       })
       .signers([mint, tokenCreator])
