@@ -1,5 +1,6 @@
 use std::fmt;
 
+use anchor_lang::solana_program::msg;
 
 pub struct BuyResult {
     pub token_amount: u64,
@@ -41,7 +42,7 @@ impl AMM {
         if tokens <= 0 {
             return 0;
         }
-    
+     
         let product_of_reserves = self.virtual_sol_reserves * self.virtual_token_reserves;
         let new_virtual_token_reserves = self.virtual_token_reserves - tokens;
         let new_virtual_sol_reserves = product_of_reserves / new_virtual_token_reserves + 1;
@@ -58,7 +59,11 @@ impl AMM {
             token_amount
         };
 
+        msg!("final_token_amount: {}", final_token_amount);
+
         let sol_amount = self.get_buy_price(token_amount);
+
+        msg!("buy price: {}", sol_amount);
 
         self.virtual_token_reserves = self.virtual_token_reserves.saturating_sub(token_amount);
         self.real_token_reserves = self.real_token_reserves.saturating_sub(token_amount);

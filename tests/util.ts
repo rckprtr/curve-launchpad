@@ -17,3 +17,13 @@ export const getTxDetails = async (connection: anchor.web3.Connection, sig) => {
     commitment: "confirmed",
   });
 };
+
+export const fundAccountSOL = async (
+  connection: anchor.web3.Connection,
+  publicKey: anchor.web3.PublicKey,
+  amount: number
+) => {
+  let fundSig = await connection.requestAirdrop(publicKey, amount);
+
+  return getTxDetails(connection, fundSig);
+};

@@ -33,7 +33,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
     global.initial_token_supply = DEFAULT_TOKEN_SUPPLY;
     global.initial_real_sol_reserves = 0;
     global.initial_real_token_reserves = DEFAULT_TOKEN_SUPPLY;
-    global.initial_virtual_sol_reserves = 0;
+    global.initial_virtual_sol_reserves = 30_000_000_000;
     global.initial_virtual_token_reserves = 1_073_000_000_000_000;
 
     msg!("Initialized global state");

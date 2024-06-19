@@ -55,9 +55,9 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         CurveSocialError::BondingCurveComplete,
     );
 
-    //user token account has enough tokens
+    //bonding curve has enough tokens
     require!(
-        ctx.accounts.user_token_account.amount <= token_amount,
+        ctx.accounts.bonding_curve.real_token_reserves >= token_amount,
         CurveSocialError::InsufficientTokens,
     );
 
@@ -66,6 +66,8 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     } else {
         token_amount
     };
+
+    msg!("CurrentBonding Curve: {}", ctx.accounts.bonding_curve.to_string());
 
     let mut amm = amm::amm::AMM::new(
         ctx.accounts.bonding_curve.virtual_sol_reserves as u128,
@@ -88,6 +90,9 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.user.lamports() >= buy_result.sol_amount,
         CurveSocialError::InsufficientSOL,
     );
+    msg!("ctx.accounts.user.lamports(): {}", ctx.accounts.user.lamports());
+    msg!("buy_result.sol_amount: {}", buy_result.sol_amount);
+
 
     let from_account = &ctx.accounts.user;
     let to_account = &ctx.accounts.bonding_curve;
@@ -145,6 +150,8 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     if bonding_curve.real_token_reserves == 0 {
         bonding_curve.complete = true;
     }
+
+    msg!("bonding_curve: {:?}", amm);
 
     Ok(())
 }
