@@ -1,8 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { CurveSocial } from "../target/types/curve_social";
-import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import { fundAccountSOL, getTxDetails, sendTransaction, toEvent } from "./util";
+import { LAMPORTS_PER_SOL, PublicKey, SendTransactionError } from "@solana/web3.js";
+import { fundAccountSOL, getAnchorError, getTxDetails, sendTransaction, toEvent } from "./util";
 import {
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
@@ -74,7 +74,7 @@ describe("curve-social", () => {
       user.publicKey
     );
 
-    return program.methods
+    let tx = await program.methods
       .buy(new BN(tokenAmount.toString()), new BN(maxSolAmount.toString()))
       .accounts({
         user: user.publicKey,
@@ -83,8 +83,16 @@ describe("curve-social", () => {
         userTokenAccount: userTokenAccount.address,
         program: program.programId,
       })
-      .signers([user])
-      .rpc();
+      .transaction();
+
+    let txResults = await sendTransaction(program, tx, [user], user.publicKey);
+
+    return {
+      tx: txResults,
+      userTokenAccount,
+      bondingCurveTokenAccount,
+      bondingCurvePDA,
+    };
   };
 
   const simpleSell = async (
@@ -110,7 +118,7 @@ describe("curve-social", () => {
       user.publicKey
     );
 
-    return program.methods
+    let tx = await program.methods
       .sell(new BN(tokenAmount.toString()), new BN(minSolAmount.toString()))
       .accounts({
         user: user.publicKey,
@@ -119,8 +127,16 @@ describe("curve-social", () => {
         userTokenAccount: userTokenAccount.address,
         program: program.programId,
       })
-      .signers([user])
-      .rpc();
+      .transaction();
+
+    let txResults = await sendTransaction(program, tx, [user], user.publicKey);
+
+    return {
+      tx: txResults,
+      userTokenAccount,
+      bondingCurveTokenAccount,
+      bondingCurvePDA,
+    };
   };
 
   before(async () => {
@@ -195,6 +211,7 @@ describe("curve-social", () => {
     });
 
     assert.equal(createEvents.length, 1);
+
     let createEvent = toEvent("createEvent", createEvents[0]);
     assert.notEqual(createEvent, null);
     if (createEvent != null) {
@@ -272,14 +289,24 @@ describe("curve-social", () => {
       tokenCreator.publicKey
     );
 
-    let buyEvents = txResult.events.filter((event) => {
+    let tradeEvents = txResult.events.filter((event) => {
       return event.name === "tradeEvent";
     });
-    assert.equal(buyEvents.length, 1);
-    let buyEvent = toEvent("tradeEvent", buyEvents[0]);
-    if(buyEvent != null){
-      assert.equal(buyEvent.tokenAmount.toNumber(), buyTokenAmount.toNumber());
+    assert.equal(tradeEvents.length, 1);
+
+    let tradeEvent = toEvent("tradeEvent", tradeEvents[0]);
+    assert.notEqual(tradeEvent, null);
+    if (tradeEvent != null) {
+      assert.equal(
+        tradeEvent.tokenAmount.toString(),
+        buyTokenAmount.toString()
+      );
     }
+
+    const tokenAmount = await connection.getTokenAccountBalance(
+      userTokenAccount.address
+    );
+    assert.equal(tokenAmount.value.amount, buyTokenAmount.toString());
   });
 
   it("can sell a token", async () => {
@@ -327,14 +354,16 @@ describe("curve-social", () => {
 
     let errorCode = "";
     try {
-      await simpleBuy(
+      let results = await simpleBuy(
         notEnoughSolUser,
         5_000_000_000_000n,
         BigInt(5 * LAMPORTS_PER_SOL)
       );
+      console.log(results.tx.response);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "InsufficientSOL");
@@ -345,8 +374,9 @@ describe("curve-social", () => {
     try {
       await simpleBuy(tokenCreator, DEFAULT_TOKEN_BALANCE / 100n, 1n);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "MaxSOLCostExceeded");
@@ -357,8 +387,9 @@ describe("curve-social", () => {
     try {
       await simpleBuy(tokenCreator, 0n, 1n);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "MinBuy");
@@ -369,8 +400,9 @@ describe("curve-social", () => {
     try {
       await simpleSell(tokenCreator, DEFAULT_TOKEN_BALANCE, 0n);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "InsufficientTokens");
@@ -381,8 +413,9 @@ describe("curve-social", () => {
     try {
       await simpleSell(tokenCreator, 0n, 0n);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "MinSell");
@@ -393,8 +426,9 @@ describe("curve-social", () => {
     try {
       await simpleSell(tokenCreator, 1n, DEFAULT_TOKEN_BALANCE);
     } catch (err) {
-      if (err instanceof anchor.AnchorError) {
-        errorCode = err.error.errorCode.code;
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
       }
     }
     assert.equal(errorCode, "MinSOLOutputExceeded");

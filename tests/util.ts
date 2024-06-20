@@ -1,6 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
   PublicKey,
+  SendTransactionError,
   Transaction,
   TransactionMessage,
   VersionedTransaction,
@@ -141,6 +142,15 @@ export const sendTransaction = async (
     events,
   };
 };
+
+export const getAnchorError = (error: any) => {
+  if (error instanceof anchor.AnchorError) {
+    return error;
+  } else if(error instanceof SendTransactionError){
+    return anchor.AnchorError.parse(error.logs || []);
+  }
+  return null;
+}
 
 export const fundAccountSOL = async (
   connection: anchor.web3.Connection,
