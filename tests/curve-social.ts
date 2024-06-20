@@ -123,8 +123,6 @@ describe("curve-social", () => {
       .accounts({
         user: user.publicKey,
         mint: mint.publicKey,
-        bondingCurveTokenAccount: bondingCurveTokenAccount,
-        userTokenAccount: userTokenAccount.address,
         program: program.programId,
       })
       .transaction();
@@ -162,8 +160,6 @@ describe("curve-social", () => {
       .accounts({
         user: user.publicKey,
         mint: mint.publicKey,
-        bondingCurveTokenAccount: bondingCurveTokenAccount,
-        userTokenAccount: userTokenAccount.address,
         program: program.programId,
       })
       .transaction();
@@ -235,7 +231,6 @@ describe("curve-social", () => {
       .accounts({
         mint: mint.publicKey,
         creator: tokenCreator.publicKey,
-        bondingCurveTokenAccount: bondingCurveTokenAccount,
         program: program.programId,
       })
       .transaction();

@@ -1,5 +1,5 @@
 use crate::{
-    state::{BondingCurve, Global}, CreateEvent, CurveSocialError
+    state::{BondingCurve, Global}, CreateEvent, CurveSocialError, DEFAULT_DECIMALS
 };
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -19,7 +19,7 @@ pub struct Create<'info> {
     #[account(
         init,
         payer = creator,
-        mint::decimals = 6,
+        mint::decimals = DEFAULT_DECIMALS as u8,
         mint::authority = mint_authority,
         mint::freeze_authority = mint_authority
     )]
