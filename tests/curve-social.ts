@@ -4,38 +4,29 @@ import { CurveSocial } from "../target/types/curve_social";
 import {
   LAMPORTS_PER_SOL,
   PublicKey,
-  SendTransactionError,
 } from "@solana/web3.js";
 import {
   ammFromBondingCurve,
-  bigIntToSOL,
   fundAccountSOL,
   getAnchorError,
   getSPLBalance,
-  getTxDetails,
   sendTransaction,
   toEvent,
 } from "./util";
 import {
   getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync,
   getMint,
   getOrCreateAssociatedTokenAccount,
-  getTokenMetadata,
 } from "@solana/spl-token";
 import { BN } from "bn.js";
 import { assert } from "chai";
 import { Metaplex, token } from "@metaplex-foundation/js";
-import fs from "fs";
 
 const GLOBAL_SEED = "global";
-const METADATA_SEED = "metadata";
 const BONDING_CURVE_SEED = "bonding-curve";
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
-
-import IDL from "../target/idl/curve_social.json";
 
 //TODO: Unit test order is essential, need to refactor to make it so its not.
 
@@ -51,10 +42,6 @@ describe("curve-social", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-
-  let newProgram = new Program<CurveSocial>(IDL as any);
-
-  //newProgram.account.
 
   const program = anchor.workspace.CurveSocial as Program<CurveSocial>;
 
