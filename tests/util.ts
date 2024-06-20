@@ -7,6 +7,7 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { CurveSocial } from "../target/types/curve_social";
+import * as client from "../client/";
 
 type EventKeys = keyof anchor.IdlEvents<CurveSocial>;
 
@@ -66,14 +67,16 @@ export const getTransactionEvents = (
 const isEventName = (
   eventName: string
 ): eventName is keyof anchor.IdlEvents<CurveSocial> => {
-  return validEventNames.includes(eventName as keyof anchor.IdlEvents<CurveSocial>);
+  return validEventNames.includes(
+    eventName as keyof anchor.IdlEvents<CurveSocial>
+  );
 };
 
 export const toEvent = <E extends EventKeys>(
   eventName: E,
   event: any
 ): anchor.IdlEvents<CurveSocial>[E] | null => {
-  if(isEventName(eventName)){
+  if (isEventName(eventName)) {
     return getEvent(eventName, event.data);
   }
   return null;
@@ -146,11 +149,11 @@ export const sendTransaction = async (
 export const getAnchorError = (error: any) => {
   if (error instanceof anchor.AnchorError) {
     return error;
-  } else if(error instanceof SendTransactionError){
+  } else if (error instanceof SendTransactionError) {
     return anchor.AnchorError.parse(error.logs || []);
   }
   return null;
-}
+};
 
 export const fundAccountSOL = async (
   connection: anchor.web3.Connection,
@@ -160,4 +163,18 @@ export const fundAccountSOL = async (
   let fundSig = await connection.requestAirdrop(publicKey, amount);
 
   return getTxDetails(connection, fundSig);
+};
+
+export const ammFromBondingCurve = (
+  bondingCurveAccount: anchor.IdlAccounts<CurveSocial>["bondingCurve"] | null,
+  initialVirtualTokenReserves: bigint
+) => {
+  if(!bondingCurveAccount) throw new Error("Bonding curve account not found");
+  return new client.AMM(
+    BigInt(bondingCurveAccount.virtualSolReserves.toString()),
+    BigInt(bondingCurveAccount.virtualTokenReserves.toString()),
+    BigInt(bondingCurveAccount.realSolReserves.toString()),
+    BigInt(bondingCurveAccount.realTokenReserves.toString()),
+    initialVirtualTokenReserves
+  );
 };

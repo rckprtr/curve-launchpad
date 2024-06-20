@@ -7,6 +7,7 @@ import {
   SendTransactionError,
 } from "@solana/web3.js";
 import {
+  ammFromBondingCurve,
   fundAccountSOL,
   getAnchorError,
   getTxDetails,
@@ -27,7 +28,6 @@ import fs from "fs";
 
 const GLOBAL_SEED = "global";
 const METADATA_SEED = "metadata";
-const MINT_AUTHORITY_SEED = "mint-authority";
 const BONDING_CURVE_SEED = "bonding-curve";
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
@@ -39,6 +39,9 @@ describe("curve-social", () => {
   const DEFAULT_DECIMALS = 6n;
   const DEFAULT_TOKEN_BALANCE =
     1_000_000_000n * BigInt(10 ** Number(DEFAULT_DECIMALS));
+  const DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE = 30_000_000_000n;
+  const DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE = 1_073_000_000_000_000n;
+  const DEFAULT_FEE_BASIS_POINTS = 100n;
 
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -53,6 +56,7 @@ describe("curve-social", () => {
   const connection = provider.connection;
   const authority = anchor.web3.Keypair.generate();
   const tokenCreator = anchor.web3.Keypair.generate();
+  const feeRecipient = anchor.web3.Keypair.generate();
 
   const mint = anchor.web3.Keypair.generate();
 
@@ -61,16 +65,54 @@ describe("curve-social", () => {
     program.programId
   );
 
+  const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
+    program.programId
+  );
+
+  const getAmmFromBondingCurve = async () => {
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+    return ammFromBondingCurve(
+      bondingCurveAccount,
+      DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE
+    );
+  };
+
+  const assertBondingCurve = (
+    amm: any,
+    bondingCurveAccount: any,
+    complete: boolean = false
+  ) => {
+    assert.equal(
+      bondingCurveAccount.virtualTokenReserves.toString(),
+      amm.virtualTokenReserves.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.virtualSolReserves.toString(),
+      amm.virtualSolReserves.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.realTokenReserves.toString(),
+      amm.realTokenReserves.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.realSolReserves.toString(),
+      amm.realSolReserves.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.tokenTotalSupply.toString(),
+      DEFAULT_TOKEN_BALANCE.toString()
+    );
+    assert.equal(bondingCurveAccount.complete, complete);
+  };
+
   const simpleBuy = async (
     user: anchor.web3.Keypair,
     tokenAmount: bigint,
     maxSolAmount: bigint
   ) => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
     const bondingCurveTokenAccount = await getAssociatedTokenAddress(
       mint.publicKey,
       bondingCurvePDA,
@@ -110,11 +152,6 @@ describe("curve-social", () => {
     tokenAmount: bigint,
     minSolAmount: bigint
   ) => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
     const bondingCurveTokenAccount = await getAssociatedTokenAddress(
       mint.publicKey,
       bondingCurvePDA,
@@ -172,23 +209,25 @@ describe("curve-social", () => {
 
     assert.equal(global.authority.toBase58(), authority.publicKey.toBase58());
     assert.equal(global.initialized, true);
+
+    await program.methods
+      .setParams(
+        feeRecipient.publicKey,
+        new BN(DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE.toString()),
+        new BN(DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE.toString()),
+        new BN(DEFAULT_TOKEN_BALANCE.toString()),
+        new BN(DEFAULT_TOKEN_BALANCE.toString()),
+        new BN(DEFAULT_FEE_BASIS_POINTS.toString())
+      )
+      .accounts({
+        user: authority.publicKey,
+        program: program.programId,
+      })
+      .signers([authority])
+      .rpc();
   });
 
   it("can mint a token", async () => {
-    const [metadataPDA] = PublicKey.findProgramAddressSync(
-      [
-        Buffer.from(METADATA_SEED),
-        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
-        mint.publicKey.toBuffer(),
-      ],
-      TOKEN_METADATA_PROGRAM_ID
-    );
-
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
-
     const bondingCurveTokenAccount = await getAssociatedTokenAddress(
       mint.publicKey,
       bondingCurvePDA,
@@ -257,17 +296,57 @@ describe("curve-social", () => {
     assert.equal(token.name, name);
     assert.equal(token.symbol, symbol);
     assert.equal(token.uri, uri);
+
+    let bondingCurveTokenAccountInfo = await connection.getTokenAccountBalance(
+      bondingCurveTokenAccount
+    );
+
+    assert.equal(
+      bondingCurveTokenAccountInfo.value.amount,
+      DEFAULT_TOKEN_BALANCE.toString()
+    );
+
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+
+    assert.equal(
+      bondingCurveAccount.virtualTokenReserves.toString(),
+      DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.virtualSolReserves.toString(),
+      DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE.toString()
+    );
+    assert.equal(
+      bondingCurveAccount.realTokenReserves.toString(),
+      DEFAULT_TOKEN_BALANCE.toString()
+    );
+    assert.equal(bondingCurveAccount.realSolReserves.toString(), "0");
+    assert.equal(
+      bondingCurveAccount.tokenTotalSupply.toString(),
+      DEFAULT_TOKEN_BALANCE.toString()
+    );
+    assert.equal(bondingCurveAccount.complete, false);
   });
 
   it("can buy a token", async () => {
+    let currentAMM = await getAmmFromBondingCurve();
+
     let buyMaxSOLAmount = BigInt(10 * LAMPORTS_PER_SOL);
     let buyTokenAmount = DEFAULT_TOKEN_BALANCE / 100n;
+
+    let buyResult = currentAMM.applyBuy(buyTokenAmount);
 
     let txResult = await simpleBuy(
       tokenCreator,
       buyTokenAmount,
       buyMaxSOLAmount
     );
+
+    let targetCurrentSupply = (
+      DEFAULT_TOKEN_BALANCE - buyTokenAmount
+    ).toString();
 
     let tradeEvents = txResult.tx.events.filter((event) => {
       return event.name === "tradeEvent";
@@ -283,23 +362,62 @@ describe("curve-social", () => {
       );
 
       assert.equal(tradeEvent.isBuy, true);
+      assert.equal(
+        tradeEvent.solAmount.toString(),
+        buyResult.sol_amount.toString()
+      );
     }
 
     const tokenAmount = await connection.getTokenAccountBalance(
       txResult.userTokenAccount.address
     );
     assert.equal(tokenAmount.value.amount, buyTokenAmount.toString());
+
+    let bondingCurveTokenAccountInfo = await connection.getTokenAccountBalance(
+      txResult.bondingCurveTokenAccount
+    );
+
+    assert.equal(
+      bondingCurveTokenAccountInfo.value.amount,
+      targetCurrentSupply
+    );
+
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+
+    assertBondingCurve(currentAMM, bondingCurveAccount);
+
   });
 
   it("can sell a token", async () => {
+    let currentAMM = await getAmmFromBondingCurve();
+
     let tokenAmount = 10000000n;
     let minSolAmount = 0n;
 
-    let results = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
+    let sellResults = currentAMM.applySell(tokenAmount);
 
-    let tradeEvents = results.tx.events.filter((event) => {
+    let preSaleBalance = await connection.getTokenAccountBalance(
+      (await getOrCreateAssociatedTokenAccount(
+        connection,
+        tokenCreator,
+        mint.publicKey,
+        tokenCreator.publicKey
+      )).address
+    );
+
+    let txResult = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
+
+    let tradeEvents = txResult.tx.events.filter((event) => {
       return event.name === "tradeEvent";
     });
+
+    let userTokenAccount = await connection.getTokenAccountBalance(
+      txResult.userTokenAccount.address
+    );
+
+    assert.equal(userTokenAccount.value.amount, (BigInt(preSaleBalance.value.amount) - tokenAmount).toString());
 
     assert.equal(tradeEvents.length, 1);
 
@@ -308,8 +426,28 @@ describe("curve-social", () => {
     if (tradeEvent != null) {
       assert.equal(tradeEvent.tokenAmount.toString(), tokenAmount.toString());
       assert.equal(tradeEvent.isBuy, false);
+      assert.equal(
+        tradeEvent.solAmount.toString(),
+        sellResults.sol_amount.toString()
+      );
     }
+
+    let bondingCurveTokenAccountInfo = await connection.getTokenAccountBalance(
+      txResult.bondingCurveTokenAccount
+    );
+
+    assert.equal(
+      bondingCurveTokenAccountInfo.value.amount,
+      currentAMM.realTokenReserves.toString()
+    );
+
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+    assertBondingCurve(currentAMM, bondingCurveAccount);
   });
+
+  //excpetion unit tests
 
   it("can't buy a token, not enough SOL", async () => {
     const notEnoughSolUser = anchor.web3.Keypair.generate();
@@ -401,6 +539,8 @@ describe("curve-social", () => {
     assert.equal(errorCode, "MinSOLOutputExceeded");
   });
 
+  //param unit tests
+
   it("can set params", async () => {
     let tx = await program.methods
       .setParams(
@@ -455,7 +595,10 @@ describe("curve-social", () => {
         setParamsEvent.initialTokenSupply.toString(),
         new BN(4000).toString()
       );
-      assert.equal(setParamsEvent.feeBasisPoints.toString(), new BN(100).toString());
+      assert.equal(
+        setParamsEvent.feeBasisPoints.toString(),
+        new BN(100).toString()
+      );
     }
 
     assert.equal(
