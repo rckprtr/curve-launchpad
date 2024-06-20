@@ -431,10 +431,6 @@ describe("curve-social", () => {
       );
     }
 
-    let bondingCurveTokenAccountInfo = await connection.getTokenAccountBalance(
-      txResult.bondingCurveTokenAccount
-    );
-
     let curvePostSaleBalance = await getSPLBalance(
       connection,
       mint.publicKey,
@@ -443,7 +439,7 @@ describe("curve-social", () => {
     );
 
     assert.equal(
-      bondingCurveTokenAccountInfo.value.amount,
+      curvePostSaleBalance,
       (BigInt(curvePreSaleBalance) + tokenAmount).toString()
     );
 
