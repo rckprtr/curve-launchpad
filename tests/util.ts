@@ -1,5 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import {
+  Connection,
+  LAMPORTS_PER_SOL,
   PublicKey,
   SendTransactionError,
   Transaction,
@@ -8,6 +10,7 @@ import {
 } from "@solana/web3.js";
 import { CurveSocial } from "../target/types/curve_social";
 import * as client from "../client/";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
 type EventKeys = keyof anchor.IdlEvents<CurveSocial>;
 
@@ -177,4 +180,24 @@ export const ammFromBondingCurve = (
     BigInt(bondingCurveAccount.realTokenReserves.toString()),
     initialVirtualTokenReserves
   );
+};
+
+export const bigIntToSOL = (amount: bigint) => {
+  return amount / BigInt(LAMPORTS_PER_SOL);
+}
+
+export const getSPLBalance = async (
+  connection: Connection,
+  mintAddress: PublicKey,
+  pubKey: PublicKey,
+  allowOffCurve: boolean = false
+) => {
+  try {
+    let ata = getAssociatedTokenAddressSync(mintAddress, pubKey, allowOffCurve);
+    const balance = await connection.getTokenAccountBalance(ata, "processed");
+    return balance.value.amount;
+  } catch (e) {
+    console.error(e);
+  }
+  return '0';
 };

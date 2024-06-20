@@ -8,8 +8,10 @@ import {
 } from "@solana/web3.js";
 import {
   ammFromBondingCurve,
+  bigIntToSOL,
   fundAccountSOL,
   getAnchorError,
+  getSPLBalance,
   getTxDetails,
   sendTransaction,
   toEvent,
@@ -35,10 +37,13 @@ const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 
 import IDL from "../target/idl/curve_social.json";
 
+//TODO: Unit test order is essential, need to refactor to make it so its not.
+
 describe("curve-social", () => {
   const DEFAULT_DECIMALS = 6n;
   const DEFAULT_TOKEN_BALANCE =
     1_000_000_000n * BigInt(10 ** Number(DEFAULT_DECIMALS));
+  const DEFAULT_INITIAL_TOKEN_RESERVES = 793_100_000_000_000n;
   const DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE = 30_000_000_000n;
   const DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE = 1_073_000_000_000_000n;
   const DEFAULT_FEE_BASIS_POINTS = 100n;
@@ -215,7 +220,7 @@ describe("curve-social", () => {
         feeRecipient.publicKey,
         new BN(DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE.toString()),
         new BN(DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE.toString()),
-        new BN(DEFAULT_TOKEN_BALANCE.toString()),
+        new BN(DEFAULT_INITIAL_TOKEN_RESERVES.toString()),
         new BN(DEFAULT_TOKEN_BALANCE.toString()),
         new BN(DEFAULT_FEE_BASIS_POINTS.toString())
       )
@@ -320,7 +325,7 @@ describe("curve-social", () => {
     );
     assert.equal(
       bondingCurveAccount.realTokenReserves.toString(),
-      DEFAULT_TOKEN_BALANCE.toString()
+      DEFAULT_INITIAL_TOKEN_RESERVES.toString()
     );
     assert.equal(bondingCurveAccount.realSolReserves.toString(), "0");
     assert.equal(
@@ -387,7 +392,6 @@ describe("curve-social", () => {
     );
 
     assertBondingCurve(currentAMM, bondingCurveAccount);
-
   });
 
   it("can sell a token", async () => {
@@ -398,13 +402,17 @@ describe("curve-social", () => {
 
     let sellResults = currentAMM.applySell(tokenAmount);
 
-    let preSaleBalance = await connection.getTokenAccountBalance(
-      (await getOrCreateAssociatedTokenAccount(
-        connection,
-        tokenCreator,
-        mint.publicKey,
-        tokenCreator.publicKey
-      )).address
+    let userPreSaleBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      tokenCreator.publicKey
+    );
+
+    let curvePreSaleBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      bondingCurvePDA,
+      true
     );
 
     let txResult = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
@@ -413,12 +421,16 @@ describe("curve-social", () => {
       return event.name === "tradeEvent";
     });
 
-    let userTokenAccount = await connection.getTokenAccountBalance(
-      txResult.userTokenAccount.address
+    let userPostSaleBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      tokenCreator.publicKey
     );
 
-    assert.equal(userTokenAccount.value.amount, (BigInt(preSaleBalance.value.amount) - tokenAmount).toString());
-
+    assert.equal(
+      userPostSaleBalance,
+      (BigInt(userPreSaleBalance) - tokenAmount).toString()
+    );
     assert.equal(tradeEvents.length, 1);
 
     let tradeEvent = toEvent("tradeEvent", tradeEvents[0]);
@@ -436,9 +448,16 @@ describe("curve-social", () => {
       txResult.bondingCurveTokenAccount
     );
 
+    let curvePostSaleBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      bondingCurvePDA,
+      true
+    );
+
     assert.equal(
       bondingCurveTokenAccountInfo.value.amount,
-      currentAMM.realTokenReserves.toString()
+      (BigInt(curvePreSaleBalance) + tokenAmount).toString()
     );
 
     let bondingCurveAccount = await program.account.bondingCurve.fetch(
@@ -539,8 +558,103 @@ describe("curve-social", () => {
     assert.equal(errorCode, "MinSOLOutputExceeded");
   });
 
-  //param unit tests
+  //curve complete unit tests
+  it("can complete the curve", async () => {
+    let currentAMM = await getAmmFromBondingCurve();
 
+    let buyTokenAmount = currentAMM.realTokenReserves;
+    let maxSolAmount = currentAMM.getBuyPrice(buyTokenAmount);
+
+    let buyResult = currentAMM.applyBuy(buyTokenAmount);
+
+    let userPrePurchaseBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      tokenCreator.publicKey
+    );
+
+    let txResult = await simpleBuy(tokenCreator, buyTokenAmount, maxSolAmount);
+
+    let tradeEvents = txResult.tx.events.filter((event) => {
+      return event.name === "tradeEvent";
+    });
+    assert.equal(tradeEvents.length, 1);
+
+    let tradeEvent = toEvent("tradeEvent", tradeEvents[0]);
+    assert.notEqual(tradeEvent, null);
+    if (tradeEvent != null) {
+      assert.equal(tradeEvent.isBuy, true);
+      assert.equal(
+        tradeEvent.solAmount.toString(),
+        buyResult.sol_amount.toString()
+      );
+    }
+
+    let userPostPurchaseBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      tokenCreator.publicKey
+    );
+
+    assert.equal(
+      userPostPurchaseBalance,
+      (BigInt(userPrePurchaseBalance) + buyTokenAmount).toString()
+    );
+
+    let bondingCurveTokenAccountInfo = await connection.getTokenAccountBalance(
+      txResult.bondingCurveTokenAccount
+    );
+
+    assert.equal(
+      (
+        BigInt(bondingCurveTokenAccountInfo.value.amount) +
+        DEFAULT_INITIAL_TOKEN_RESERVES
+      ).toString(),
+      DEFAULT_TOKEN_BALANCE.toString()
+    );
+
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+
+    assertBondingCurve(currentAMM, bondingCurveAccount, true);
+  });
+
+  it("can't buy a token, curve complete", async () => {
+    let currentAMM = await getAmmFromBondingCurve();
+
+    let buyTokenAmount = 100n;
+    let maxSolAmount = currentAMM.getBuyPrice(buyTokenAmount);
+
+    let errorCode = "";
+    try {
+      await simpleBuy(tokenCreator, buyTokenAmount, maxSolAmount);
+    } catch (err) {
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "BondingCurveComplete");
+  });
+
+  it("can't sell a token, curve complete", async () => {
+    let tokenAmount = 100n;
+    let minSolAmount = 0n;
+
+    let errorCode = "";
+    try {
+      await simpleSell(tokenCreator, tokenAmount, minSolAmount);
+    } catch (err) {
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "BondingCurveComplete");
+  });
+
+  //param unit tests
   it("can set params", async () => {
     let tx = await program.methods
       .setParams(
@@ -650,6 +764,6 @@ describe("curve-social", () => {
 });
 
 //TODO: Tests
-// test buy whole curve
+// test buy
+// complete curve
 // test sell whole curve
-// test events

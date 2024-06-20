@@ -148,7 +148,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     bonding_curve.virtual_sol_reserves = ctx.accounts.global.initial_virtual_sol_reserves;
     bonding_curve.virtual_token_reserves = ctx.accounts.global.initial_virtual_token_reserves;
     bonding_curve.real_sol_reserves = 0;
-    bonding_curve.real_token_reserves = ctx.accounts.global.initial_token_supply;
+    bonding_curve.real_token_reserves = ctx.accounts.global.initial_real_token_reserves;
     bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
     bonding_curve.complete = false;
 
