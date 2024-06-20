@@ -2,11 +2,10 @@ use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
-    amm,
-    state::{BondingCurve, Global},
-    CurveSocialError,
+    amm, state::{BondingCurve, Global}, CompleteEvent, CurveSocialError, TradeEvent
 };
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct Buy<'info> {
     #[account(mut)]
@@ -151,8 +150,28 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     bonding_curve.virtual_token_reserves = amm.virtual_token_reserves as u64;
     bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves as u64;
 
+    emit_cpi!(TradeEvent {
+        mint: *ctx.accounts.mint.to_account_info().key,
+        sol_amount: buy_result.sol_amount,
+        token_amount: buy_result.token_amount,
+        is_buy: true,
+        user: *ctx.accounts.user.to_account_info().key,
+        timestamp: Clock::get()?.unix_timestamp,
+        virtual_sol_reserves: bonding_curve.virtual_sol_reserves,
+        virtual_token_reserves: bonding_curve.virtual_token_reserves,
+        real_sol_reserves: bonding_curve.real_sol_reserves,
+        real_token_reserves: bonding_curve.real_token_reserves,
+    });
+
     if bonding_curve.real_token_reserves == 0 {
         bonding_curve.complete = true;
+
+        emit_cpi!(CompleteEvent {
+            user: *ctx.accounts.user.to_account_info().key,
+            mint: *ctx.accounts.mint.to_account_info().key,
+            bonding_curve: *ctx.accounts.bonding_curve.to_account_info().key,
+            timestamp: Clock::get()?.unix_timestamp,
+        });
     }
 
     msg!("bonding_curve: {:?}", amm);

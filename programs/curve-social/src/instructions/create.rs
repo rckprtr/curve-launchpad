@@ -1,6 +1,5 @@
 use crate::{
-    state::{BondingCurve, Global},
-    CurveSocialError,
+    state::{BondingCurve, Global}, CreateEvent, CurveSocialError
 };
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -29,7 +28,7 @@ pub struct Create<'info> {
     #[account(mut)]
     creator: Signer<'info>,
 
-    /// CHECK: New account for mint_authority
+    /// CHECK: Using seed to validate mint_authority account
     #[account(
         seeds=[b"mint-authority"],
         bump,
@@ -59,6 +58,7 @@ pub struct Create<'info> {
     )]
     global: Box<Account<'info, Global>>,
 
+    ///CHECK: Using seed to validate metadata account
     #[account(
         mut,
         seeds = [
@@ -82,15 +82,6 @@ pub struct Create<'info> {
     rent: Sysvar<'info, Rent>,
 }
 
-#[event]
-pub struct CreateEvent {
-    pub name: String,
-    pub symbol: String,
-    pub uri: String,
-    pub mint: Pubkey,
-    pub bonding_curve: Pubkey,
-    pub creator: Pubkey,
-}
 
 pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
     //confirm program is initialized

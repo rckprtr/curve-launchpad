@@ -46,7 +46,7 @@ impl AMM {
         let new_virtual_sol_reserves = product_of_reserves / new_virtual_token_reserves + 1;
         let amount_needed = new_virtual_sol_reserves.saturating_sub(self.virtual_sol_reserves);
     
-        if amount_needed > 0 { amount_needed } else { 0 }
+        amount_needed
     }
 
     pub fn apply_buy(&mut self, token_amount: u128) -> BuyResult {

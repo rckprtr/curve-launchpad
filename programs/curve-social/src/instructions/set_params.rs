@@ -1,6 +1,7 @@
-use crate::{state::Global, CurveSocialError};
+use crate::{state::Global, CurveSocialError, SetParamsEvent};
 use anchor_lang::prelude::*;
 
+#[event_cpi]
 #[derive(Accounts)]
 pub struct SetParams<'info> {
     #[account(
@@ -44,6 +45,15 @@ pub fn set_params(
     global.initial_real_token_reserves = initial_real_token_reserves;
     global.initial_token_supply = token_total_supply;
     global.fee_basis_points = fee_basis_points;
+
+    emit_cpi!(SetParamsEvent {
+        fee_recipient,
+        initial_virtual_token_reserves,
+        initial_virtual_sol_reserves,
+        initial_real_token_reserves,
+        token_total_supply,
+        fee_basis_points,
+    });
 
     Ok(())
 }
