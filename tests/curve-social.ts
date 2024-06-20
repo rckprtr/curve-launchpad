@@ -80,6 +80,7 @@ describe("curve-social", () => {
         mint: mint.publicKey,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
+        program: program.programId,
       })
       .signers([user])
       .rpc();
@@ -115,6 +116,7 @@ describe("curve-social", () => {
         mint: mint.publicKey,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
+        program: program.programId,
       })
       .signers([user])
       .rpc();
@@ -230,6 +232,7 @@ describe("curve-social", () => {
         mint: mint.publicKey,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
+        program: program.programId,
       })
       .signers([tokenCreator])
       .rpc();
@@ -261,6 +264,7 @@ describe("curve-social", () => {
         mint: mint.publicKey,
         bondingCurveTokenAccount: bondingCurveTokenAccount,
         userTokenAccount: userTokenAccount.address,
+        program: program.programId,
       })
       .signers([tokenCreator])
       .rpc();
@@ -364,6 +368,7 @@ describe("curve-social", () => {
       )
       .accounts({
         user: authority.publicKey,
+        program: program.programId,
       })
       .signers([authority])
       .rpc();
