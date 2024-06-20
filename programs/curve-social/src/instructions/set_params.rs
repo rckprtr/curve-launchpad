@@ -22,7 +22,7 @@ pub fn set_params(
     initial_virtual_token_reserves: u64,
     initial_virtual_sol_reserves: u64,
     initial_real_token_reserves: u64,
-    token_total_supply: u64,
+    initial_token_supply: u64,
     fee_basis_points: u64,
 ) -> Result<()> {
     let global = &mut ctx.accounts.global;
@@ -43,7 +43,7 @@ pub fn set_params(
     global.initial_virtual_token_reserves = initial_virtual_token_reserves;
     global.initial_virtual_sol_reserves = initial_virtual_sol_reserves;
     global.initial_real_token_reserves = initial_real_token_reserves;
-    global.initial_token_supply = token_total_supply;
+    global.initial_token_supply = initial_token_supply;
     global.fee_basis_points = fee_basis_points;
 
     emit_cpi!(SetParamsEvent {
@@ -51,7 +51,7 @@ pub fn set_params(
         initial_virtual_token_reserves,
         initial_virtual_sol_reserves,
         initial_real_token_reserves,
-        token_total_supply,
+        initial_token_supply,
         fee_basis_points,
     });
 

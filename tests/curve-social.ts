@@ -1,8 +1,18 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { CurveSocial } from "../target/types/curve_social";
-import { LAMPORTS_PER_SOL, PublicKey, SendTransactionError } from "@solana/web3.js";
-import { fundAccountSOL, getAnchorError, getTxDetails, sendTransaction, toEvent } from "./util";
+import {
+  LAMPORTS_PER_SOL,
+  PublicKey,
+  SendTransactionError,
+} from "@solana/web3.js";
+import {
+  fundAccountSOL,
+  getAnchorError,
+  getTxDetails,
+  sendTransaction,
+  toEvent,
+} from "./util";
 import {
   getAssociatedTokenAddress,
   getAssociatedTokenAddressSync,
@@ -250,46 +260,16 @@ describe("curve-social", () => {
   });
 
   it("can buy a token", async () => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
+    let buyMaxSOLAmount = BigInt(10 * LAMPORTS_PER_SOL);
+    let buyTokenAmount = DEFAULT_TOKEN_BALANCE / 100n;
 
-    const bondingCurveTokenAccount = await getAssociatedTokenAddressSync(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
-
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
+    let txResult = await simpleBuy(
       tokenCreator,
-      mint.publicKey,
-      tokenCreator.publicKey
+      buyTokenAmount,
+      buyMaxSOLAmount
     );
 
-    let buyMaxSOLAmount = new BN(10 * LAMPORTS_PER_SOL);
-    let buyTokenAmount = new BN((DEFAULT_TOKEN_BALANCE / 100n).toString());
-
-    let tx = await program.methods
-      .buy(new BN(buyTokenAmount), new BN(buyMaxSOLAmount))
-      .accounts({
-        user: tokenCreator.publicKey,
-        mint: mint.publicKey,
-        bondingCurveTokenAccount: bondingCurveTokenAccount,
-        userTokenAccount: userTokenAccount.address,
-        program: program.programId,
-      })
-      .transaction();
-
-    let txResult = await sendTransaction(
-      program,
-      tx,
-      [tokenCreator],
-      tokenCreator.publicKey
-    );
-
-    let tradeEvents = txResult.events.filter((event) => {
+    let tradeEvents = txResult.tx.events.filter((event) => {
       return event.name === "tradeEvent";
     });
     assert.equal(tradeEvents.length, 1);
@@ -301,46 +281,34 @@ describe("curve-social", () => {
         tradeEvent.tokenAmount.toString(),
         buyTokenAmount.toString()
       );
+
+      assert.equal(tradeEvent.isBuy, true);
     }
 
     const tokenAmount = await connection.getTokenAccountBalance(
-      userTokenAccount.address
+      txResult.userTokenAccount.address
     );
     assert.equal(tokenAmount.value.amount, buyTokenAmount.toString());
   });
 
   it("can sell a token", async () => {
-    const [bondingCurvePDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from(BONDING_CURVE_SEED), mint.publicKey.toBuffer()],
-      program.programId
-    );
+    let tokenAmount = 10000000n;
+    let minSolAmount = 0n;
 
-    const bondingCurveTokenAccount = await getAssociatedTokenAddress(
-      mint.publicKey,
-      bondingCurvePDA,
-      true
-    );
+    let results = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
 
-    const userTokenAccount = await getOrCreateAssociatedTokenAccount(
-      connection,
-      tokenCreator,
-      mint.publicKey,
-      tokenCreator.publicKey
-    );
+    let tradeEvents = results.tx.events.filter((event) => {
+      return event.name === "tradeEvent";
+    });
 
-    await program.methods
-      .sell(new BN(10000000), new BN(0))
-      .accounts({
-        user: tokenCreator.publicKey,
-        mint: mint.publicKey,
-        bondingCurveTokenAccount: bondingCurveTokenAccount,
-        userTokenAccount: userTokenAccount.address,
-        program: program.programId,
-      })
-      .signers([tokenCreator])
-      .rpc();
+    assert.equal(tradeEvents.length, 1);
 
-    await simpleSell(tokenCreator, 10000000n, 0n);
+    let tradeEvent = toEvent("tradeEvent", tradeEvents[0]);
+    assert.notEqual(tradeEvent, null);
+    if (tradeEvent != null) {
+      assert.equal(tradeEvent.tokenAmount.toString(), tokenAmount.toString());
+      assert.equal(tradeEvent.isBuy, false);
+    }
   });
 
   it("can't buy a token, not enough SOL", async () => {
@@ -354,12 +322,11 @@ describe("curve-social", () => {
 
     let errorCode = "";
     try {
-      let results = await simpleBuy(
+      await simpleBuy(
         notEnoughSolUser,
         5_000_000_000_000n,
         BigInt(5 * LAMPORTS_PER_SOL)
       );
-      console.log(results.tx.response);
     } catch (err) {
       let anchorError = getAnchorError(err);
       if (anchorError) {
@@ -435,7 +402,7 @@ describe("curve-social", () => {
   });
 
   it("can set params", async () => {
-    await program.methods
+    let tx = await program.methods
       .setParams(
         TOKEN_METADATA_PROGRAM_ID,
         new BN(1000),
@@ -448,10 +415,48 @@ describe("curve-social", () => {
         user: authority.publicKey,
         program: program.programId,
       })
-      .signers([authority])
-      .rpc();
+      .transaction();
+
+    let txResult = await sendTransaction(
+      program,
+      tx,
+      [authority],
+      authority.publicKey
+    );
 
     let global = await program.account.global.fetch(globalPDA);
+
+    let setParamsEvents = txResult.events.filter((event) => {
+      return event.name === "setParamsEvent";
+    });
+
+    assert.equal(setParamsEvents.length, 1);
+
+    let setParamsEvent = toEvent("setParamsEvent", setParamsEvents[0]);
+    assert.notEqual(setParamsEvent, null);
+    if (setParamsEvent != null) {
+      assert.equal(
+        setParamsEvent.feeRecipient.toBase58(),
+        TOKEN_METADATA_PROGRAM_ID.toBase58()
+      );
+      assert.equal(
+        setParamsEvent.initialVirtualTokenReserves.toString(),
+        new BN(1000).toString()
+      );
+      assert.equal(
+        setParamsEvent.initialVirtualSolReserves.toString(),
+        new BN(2000).toString()
+      );
+      assert.equal(
+        setParamsEvent.initialRealTokenReserves.toString(),
+        new BN(3000).toString()
+      );
+      assert.equal(
+        setParamsEvent.initialTokenSupply.toString(),
+        new BN(4000).toString()
+      );
+      assert.equal(setParamsEvent.feeBasisPoints.toString(), new BN(100).toString());
+    }
 
     assert.equal(
       global.feeRecipient.toBase58(),
@@ -472,17 +477,36 @@ describe("curve-social", () => {
     assert.equal(global.initialTokenSupply.toString(), new BN(4000).toString());
     assert.equal(global.feeBasisPoints.toString(), new BN(100).toString());
   });
+
+  it("can't set params as non-authority", async () => {
+    let errorCode = "";
+    try {
+      await program.methods
+        .setParams(
+          TOKEN_METADATA_PROGRAM_ID,
+          new BN(1000),
+          new BN(2000),
+          new BN(3000),
+          new BN(4000),
+          new BN(100)
+        )
+        .accounts({
+          user: tokenCreator.publicKey,
+          program: program.programId,
+        })
+        .signers([tokenCreator])
+        .rpc();
+    } catch (err) {
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "InvalidAuthority");
+  });
 });
 
 //TODO: Tests
 // test buy whole curve
 // test sell whole curve
-
-// test set params errors
-// set params error: not authority
-
 // test events
-// test buy event
-// test sell event
-// test set params event
-// test create event
