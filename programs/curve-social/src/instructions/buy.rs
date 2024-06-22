@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
-    amm, state::{BondingCurve, Global}, CompleteEvent, CurveSocialError, TradeEvent
+    amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveSocialError, TradeEvent
 };
 
 #[event_cpi]
@@ -16,6 +16,10 @@ pub struct Buy<'info> {
         bump,
     )]
     global: Box<Account<'info, Global>>,
+
+    /// CHECK: Using global state to validate fee_recipient account
+    #[account(mut)]
+    fee_recipient: AccountInfo<'info>,
 
     mint: Account<'info, Mint>,
 
@@ -46,7 +50,6 @@ pub struct Buy<'info> {
 }
 
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
-
     require!(
         ctx.accounts.global.initialized,
         CurveSocialError::NotInitialized
@@ -58,16 +61,19 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         CurveSocialError::BondingCurveComplete,
     );
 
+    //invalid fee recipient
+    require!(
+        ctx.accounts.fee_recipient.key == &ctx.accounts.global.fee_recipient,
+        CurveSocialError::InvalidFeeRecipient,
+    );
+
     //bonding curve has enough tokens
     require!(
         ctx.accounts.bonding_curve.real_token_reserves >= token_amount,
         CurveSocialError::InsufficientTokens,
     );
 
-    require!(
-        token_amount > 0,
-        CurveSocialError::MinBuy,
-    );
+    require!(token_amount > 0, CurveSocialError::MinBuy,);
 
     let targe_token_amount = if ctx.accounts.bonding_curve_token_account.amount < token_amount {
         ctx.accounts.bonding_curve_token_account.amount
@@ -83,27 +89,29 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.global.initial_virtual_token_reserves as u128,
     );
 
-    let buy_result = amm.apply_buy(targe_token_amount as u128);
+    let buy_result = amm.apply_buy(targe_token_amount as u128).unwrap();
+    let fee = calculate_fee(buy_result.sol_amount, ctx.accounts.global.fee_basis_points);
+    let buy_amount_with_fee = buy_result.sol_amount + fee;
 
-    //check if the amount of SOL to transfer is less than the max_sol_cost
+    //check if the amount of SOL to transfe plus fee is less than the max_sol_cost
     require!(
-        buy_result.sol_amount <= max_sol_cost,
+        buy_amount_with_fee <= max_sol_cost,
         CurveSocialError::MaxSOLCostExceeded,
     );
 
     //check if the user has enough SOL
     require!(
-        ctx.accounts.user.lamports() >= buy_result.sol_amount,
+        ctx.accounts.user.lamports() >= buy_amount_with_fee,
         CurveSocialError::InsufficientSOL,
     );
-
+    
+    // transfer SOL to bonding curve
     let from_account = &ctx.accounts.user;
-    let to_account = &ctx.accounts.bonding_curve;
+    let to_bonding_curve_account = &ctx.accounts.bonding_curve;
 
-    // transfer SOL
     let transfer_instruction = system_instruction::transfer(
         from_account.key,
-        to_account.to_account_info().key,
+        to_bonding_curve_account.to_account_info().key,
         buy_result.sol_amount,
     );
 
@@ -111,7 +119,26 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         &transfer_instruction,
         &[
             from_account.to_account_info(),
-            to_account.to_account_info(),
+            to_bonding_curve_account.to_account_info(),
+            ctx.accounts.system_program.to_account_info(),
+        ],
+        &[],
+    )?;
+
+    //transfer SOL to fee recipient
+    let to_fee_recipient_account = &ctx.accounts.fee_recipient;
+
+    let transfer_instruction = system_instruction::transfer(
+        from_account.key,
+        to_fee_recipient_account.key,
+        fee,
+    );
+
+    anchor_lang::solana_program::program::invoke_signed(
+        &transfer_instruction,
+        &[
+            from_account.to_account_info(),
+            to_fee_recipient_account.to_account_info(),
             ctx.accounts.system_program.to_account_info(),
         ],
         &[],

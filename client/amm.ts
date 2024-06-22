@@ -18,19 +18,26 @@ export class AMM {
     ) {}
 
     getBuyPrice(tokens: bigint): bigint {
-        const product_of_reserves = this.virtualSolReserves * this.virtualTokenReserves;
-        const new_virtual_token_reserves = this.virtualTokenReserves - tokens;
-        const new_virtual_sol_reserves = product_of_reserves / new_virtual_token_reserves + 1n;
-        const amount_needed = new_virtual_sol_reserves > this.virtualSolReserves ? new_virtual_sol_reserves - this.virtualSolReserves : 0n;
-        return amount_needed > 0n ? amount_needed : 0n;
+        // const product_of_reserves = this.virtualSolReserves * this.virtualTokenReserves;
+        // const new_virtual_token_reserves = this.virtualTokenReserves - tokens;
+        // const new_virtual_sol_reserves = product_of_reserves / new_virtual_token_reserves + 1n;
+        // const amount_needed = new_virtual_sol_reserves > this.virtualSolReserves ? new_virtual_sol_reserves - this.virtualSolReserves : 0n;
+        // return amount_needed > 0n ? amount_needed : 0n;
+
+        const productOfReserves = this.virtualSolReserves * this.virtualTokenReserves;
+        const newVirtualTokenReserves = this.virtualTokenReserves - tokens;
+        const newVirtualSolReserves = (productOfReserves / newVirtualTokenReserves) + 1n;
+        const amountNeeded = newVirtualSolReserves - this.virtualSolReserves;
+
+        return amountNeeded;
     }
 
     applyBuy(token_amount: bigint): BuyResult {
         const final_token_amount = token_amount > this.realTokenReserves ? this.realTokenReserves : token_amount;
-        const sol_amount = this.getBuyPrice(token_amount);
+        const sol_amount = this.getBuyPrice(final_token_amount);
 
-        this.virtualTokenReserves = this.virtualTokenReserves - token_amount;
-        this.realTokenReserves = this.realTokenReserves - token_amount;
+        this.virtualTokenReserves = this.virtualTokenReserves - final_token_amount;
+        this.realTokenReserves = this.realTokenReserves - final_token_amount;
 
         this.virtualSolReserves = this.virtualSolReserves + sol_amount;
         this.realSolReserves = this.realSolReserves + sol_amount;

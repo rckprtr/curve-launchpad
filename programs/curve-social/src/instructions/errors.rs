@@ -23,4 +23,6 @@ pub enum CurveSocialError {
     MinBuy,
     #[msg("Min sell is 1 Token")]
     MinSell,
+    #[msg("Invalid Fee Recipient")]
+    InvalidFeeRecipient,
 }

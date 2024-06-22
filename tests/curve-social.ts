@@ -21,6 +21,7 @@ import {
 import { BN } from "bn.js";
 import { assert } from "chai";
 import { Metaplex, token } from "@metaplex-foundation/js";
+import { AMM, calculateFee } from "../client";
 
 const GLOBAL_SEED = "global";
 const BONDING_CURVE_SEED = "bonding-curve";
@@ -37,7 +38,7 @@ describe("curve-social", () => {
   const DEFAULT_INITIAL_TOKEN_RESERVES = 793_100_000_000_000n;
   const DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE = 30_000_000_000n;
   const DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE = 1_073_000_000_000_000n;
-  const DEFAULT_FEE_BASIS_POINTS = 100n;
+  const DEFAULT_FEE_BASIS_POINTS = 50n;
 
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
@@ -103,7 +104,8 @@ describe("curve-social", () => {
   const simpleBuy = async (
     user: anchor.web3.Keypair,
     tokenAmount: bigint,
-    maxSolAmount: bigint
+    maxSolAmount: bigint,
+    innerFeeRecipient: anchor.web3.Keypair = feeRecipient
   ) => {
     const bondingCurveTokenAccount = await getAssociatedTokenAddress(
       mint.publicKey,
@@ -123,6 +125,7 @@ describe("curve-social", () => {
       .accounts({
         user: user.publicKey,
         mint: mint.publicKey,
+        feeRecipient: innerFeeRecipient.publicKey,
         program: program.programId,
       })
       .transaction();
@@ -140,7 +143,8 @@ describe("curve-social", () => {
   const simpleSell = async (
     user: anchor.web3.Keypair,
     tokenAmount: bigint,
-    minSolAmount: bigint
+    minSolAmount: bigint,
+    innerFeeRecipient: anchor.web3.Keypair = feeRecipient
   ) => {
     const bondingCurveTokenAccount = await getAssociatedTokenAddress(
       mint.publicKey,
@@ -160,6 +164,7 @@ describe("curve-social", () => {
       .accounts({
         user: user.publicKey,
         mint: mint.publicKey,
+        feeRecipient: innerFeeRecipient.publicKey,
         program: program.programId,
       })
       .transaction();
@@ -320,16 +325,23 @@ describe("curve-social", () => {
   it("can buy a token", async () => {
     let currentAMM = await getAmmFromBondingCurve();
 
-    let buyMaxSOLAmount = BigInt(10 * LAMPORTS_PER_SOL);
     let buyTokenAmount = DEFAULT_TOKEN_BALANCE / 100n;
+    let buyMaxSOLAmount = currentAMM.getBuyPrice(buyTokenAmount);
+    let fee = calculateFee(buyMaxSOLAmount, Number(DEFAULT_FEE_BASIS_POINTS));
+    buyMaxSOLAmount = buyMaxSOLAmount + fee;
 
     let buyResult = currentAMM.applyBuy(buyTokenAmount);
+
+    let feeRecipientPreBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
 
     let txResult = await simpleBuy(
       tokenCreator,
       buyTokenAmount,
       buyMaxSOLAmount
     );
+
+    let feeRecipientPostBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
+    assert.equal(feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance, Number(fee));
 
     let targetCurrentSupply = (
       DEFAULT_TOKEN_BALANCE - buyTokenAmount
@@ -353,6 +365,8 @@ describe("curve-social", () => {
         tradeEvent.solAmount.toString(),
         buyResult.sol_amount.toString()
       );
+
+      assert.equal(tradeEvent.solAmount.toString(), (buyMaxSOLAmount - fee).toString());
     }
 
     const tokenAmount = await connection.getTokenAccountBalance(
@@ -380,7 +394,9 @@ describe("curve-social", () => {
     let currentAMM = await getAmmFromBondingCurve();
 
     let tokenAmount = 10000000n;
-    let minSolAmount = 0n;
+    let minSolAmount = currentAMM.getSellPrice(tokenAmount);
+    let fee = calculateFee(minSolAmount, Number(DEFAULT_FEE_BASIS_POINTS));
+    minSolAmount = minSolAmount - fee;
 
     let sellResults = currentAMM.applySell(tokenAmount);
 
@@ -397,7 +413,12 @@ describe("curve-social", () => {
       true
     );
 
+    let feeRecipientPreBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
+
     let txResult = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
+
+    let feeRecipientPostBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
+    assert.equal(feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance, Number(fee));
 
     let tradeEvents = txResult.tx.events.filter((event) => {
       return event.name === "tradeEvent";
@@ -539,10 +560,10 @@ describe("curve-social", () => {
   //curve complete unit tests
   it("can complete the curve", async () => {
     let currentAMM = await getAmmFromBondingCurve();
-
     let buyTokenAmount = currentAMM.realTokenReserves;
     let maxSolAmount = currentAMM.getBuyPrice(buyTokenAmount);
 
+    maxSolAmount = maxSolAmount + calculateFee(maxSolAmount, Number(DEFAULT_FEE_BASIS_POINTS));
     let buyResult = currentAMM.applyBuy(buyTokenAmount);
 
     let userPrePurchaseBalance = await getSPLBalance(

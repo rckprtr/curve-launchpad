@@ -6,6 +6,7 @@ pub mod create;
 pub mod set_params;
 pub mod constants;
 pub mod events;
+pub mod util;
 
 pub use initialize::*;
 pub use errors::*;
@@ -15,3 +16,4 @@ pub use create::*;
 pub use set_params::*;
 pub use constants::*;
 pub use events::*;
+pub use util::*;
