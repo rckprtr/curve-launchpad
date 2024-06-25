@@ -90,6 +90,8 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
         CurveSocialError::NotInitialized
     );
 
+    msg!("create::BondingCurve::get_lamports: {:?}", &ctx.accounts.bonding_curve.get_lamports());
+
     let seeds = &["mint-authority".as_bytes(), &[ctx.bumps.mint_authority]];
     let signer = [&seeds[..]];
 

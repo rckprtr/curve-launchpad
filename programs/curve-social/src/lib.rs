@@ -29,9 +29,14 @@ pub mod curve_social {
         sell::sell(ctx, token_amount, min_sol_output)
     }
 
+    pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
+        withdraw::withdraw(ctx)
+    }
+
     pub fn set_params(
         ctx: Context<SetParams>,
         fee_recipient: Pubkey,
+        withdraw_authority: Pubkey,
         initial_virtual_token_reserves: u64,
         initial_virtual_sol_reserves: u64,
         initial_real_token_reserves: u64,
@@ -41,6 +46,7 @@ pub mod curve_social {
         set_params::set_params(
             ctx,
             fee_recipient,
+            withdraw_authority,
             initial_virtual_token_reserves,
             initial_virtual_sol_reserves,
             initial_real_token_reserves,

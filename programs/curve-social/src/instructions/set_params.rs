@@ -19,6 +19,7 @@ pub struct SetParams<'info> {
 pub fn set_params(
     ctx: Context<SetParams>,
     fee_recipient: Pubkey,
+    withdraw_authority: Pubkey,
     initial_virtual_token_reserves: u64,
     initial_virtual_sol_reserves: u64,
     initial_real_token_reserves: u64,
@@ -45,9 +46,11 @@ pub fn set_params(
     global.initial_real_token_reserves = initial_real_token_reserves;
     global.initial_token_supply = initial_token_supply;
     global.fee_basis_points = fee_basis_points;
+    global.withdraw_authority = withdraw_authority;
 
     emit_cpi!(SetParamsEvent {
         fee_recipient,
+        withdraw_authority,
         initial_virtual_token_reserves,
         initial_virtual_sol_reserves,
         initial_real_token_reserves,

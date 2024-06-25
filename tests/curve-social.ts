@@ -1,10 +1,7 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
 import { CurveSocial } from "../target/types/curve_social";
-import {
-  LAMPORTS_PER_SOL,
-  PublicKey,
-} from "@solana/web3.js";
+import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   ammFromBondingCurve,
   fundAccountSOL,
@@ -25,9 +22,6 @@ import { AMM, calculateFee } from "../client";
 
 const GLOBAL_SEED = "global";
 const BONDING_CURVE_SEED = "bonding-curve";
-const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
-  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-);
 
 //TODO: Unit test order is essential, need to refactor to make it so its not.
 
@@ -50,6 +44,7 @@ describe("curve-social", () => {
   const authority = anchor.web3.Keypair.generate();
   const tokenCreator = anchor.web3.Keypair.generate();
   const feeRecipient = anchor.web3.Keypair.generate();
+  const withdrawAuthority = anchor.web3.Keypair.generate();
 
   const mint = anchor.web3.Keypair.generate();
 
@@ -187,6 +182,12 @@ describe("curve-social", () => {
       tokenCreator.publicKey,
       200 * LAMPORTS_PER_SOL
     );
+
+    await fundAccountSOL(
+      connection,
+      withdrawAuthority.publicKey,
+      5 * LAMPORTS_PER_SOL
+    );
   });
 
   it("Is initialized!", async () => {
@@ -206,6 +207,7 @@ describe("curve-social", () => {
     await program.methods
       .setParams(
         feeRecipient.publicKey,
+        withdrawAuthority.publicKey,
         new BN(DEFUALT_INITIAL_VIRTUAL_TOKEN_RESERVE.toString()),
         new BN(DEFAULT_INITIAL_VIRTUAL_SOL_RESERVE.toString()),
         new BN(DEFAULT_INITIAL_TOKEN_RESERVES.toString()),
@@ -332,7 +334,9 @@ describe("curve-social", () => {
 
     let buyResult = currentAMM.applyBuy(buyTokenAmount);
 
-    let feeRecipientPreBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
+    let feeRecipientPreBuySOLBalance = await connection.getBalance(
+      feeRecipient.publicKey
+    );
 
     let txResult = await simpleBuy(
       tokenCreator,
@@ -340,8 +344,13 @@ describe("curve-social", () => {
       buyMaxSOLAmount
     );
 
-    let feeRecipientPostBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
-    assert.equal(feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance, Number(fee));
+    let feeRecipientPostBuySOLBalance = await connection.getBalance(
+      feeRecipient.publicKey
+    );
+    assert.equal(
+      feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance,
+      Number(fee)
+    );
 
     let targetCurrentSupply = (
       DEFAULT_TOKEN_BALANCE - buyTokenAmount
@@ -366,7 +375,10 @@ describe("curve-social", () => {
         buyResult.sol_amount.toString()
       );
 
-      assert.equal(tradeEvent.solAmount.toString(), (buyMaxSOLAmount - fee).toString());
+      assert.equal(
+        tradeEvent.solAmount.toString(),
+        (buyMaxSOLAmount - fee).toString()
+      );
     }
 
     const tokenAmount = await connection.getTokenAccountBalance(
@@ -413,12 +425,19 @@ describe("curve-social", () => {
       true
     );
 
-    let feeRecipientPreBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
+    let feeRecipientPreBuySOLBalance = await connection.getBalance(
+      feeRecipient.publicKey
+    );
 
     let txResult = await simpleSell(tokenCreator, tokenAmount, minSolAmount);
 
-    let feeRecipientPostBuySOLBalance = await connection.getBalance(feeRecipient.publicKey);
-    assert.equal(feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance, Number(fee));
+    let feeRecipientPostBuySOLBalance = await connection.getBalance(
+      feeRecipient.publicKey
+    );
+    assert.equal(
+      feeRecipientPostBuySOLBalance - feeRecipientPreBuySOLBalance,
+      Number(fee)
+    );
 
     let tradeEvents = txResult.tx.events.filter((event) => {
       return event.name === "tradeEvent";
@@ -466,6 +485,31 @@ describe("curve-social", () => {
   });
 
   //excpetion unit tests
+  it("can't withdraw as curve is incomplete", async () => {
+    let errorCode = "";
+    try {
+      let tx = await program.methods
+        .withdraw()
+        .accounts({
+          user: withdrawAuthority.publicKey,
+          mint: mint.publicKey,
+        })
+        .transaction();
+
+      await sendTransaction(
+        program,
+        tx,
+        [withdrawAuthority],
+        withdrawAuthority.publicKey
+      );
+    } catch (err) {
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "BondingCurveNotComplete");
+  });
 
   it("can't buy a token, not enough SOL", async () => {
     const notEnoughSolUser = anchor.web3.Keypair.generate();
@@ -563,7 +607,9 @@ describe("curve-social", () => {
     let buyTokenAmount = currentAMM.realTokenReserves;
     let maxSolAmount = currentAMM.getBuyPrice(buyTokenAmount);
 
-    maxSolAmount = maxSolAmount + calculateFee(maxSolAmount, Number(DEFAULT_FEE_BASIS_POINTS));
+    maxSolAmount =
+      maxSolAmount +
+      calculateFee(maxSolAmount, Number(DEFAULT_FEE_BASIS_POINTS));
     let buyResult = currentAMM.applyBuy(buyTokenAmount);
 
     let userPrePurchaseBalance = await getSPLBalance(
@@ -653,11 +699,116 @@ describe("curve-social", () => {
     assert.equal(errorCode, "BondingCurveComplete");
   });
 
+  it("can't withdraw as incorrect authority", async () => {
+    let errorCode = "";
+    try {
+      let tx = await program.methods
+        .withdraw()
+        .accounts({
+          user: tokenCreator.publicKey,
+          mint: mint.publicKey,
+        })
+        .transaction();
+
+      await sendTransaction(
+        program,
+        tx,
+        [tokenCreator],
+        tokenCreator.publicKey
+      );
+    } catch (err) {
+      let anchorError = getAnchorError(err);
+      if (anchorError) {
+        errorCode = anchorError.error.errorCode.code;
+      }
+    }
+    assert.equal(errorCode, "InvalidWithdrawAuthority");
+  });
+
+  //it can withdraw
+  it("can withdraw", async () => {
+    let withdrawAuthorityPreSOLBalance = await connection.getBalance(
+      feeRecipient.publicKey
+    );
+    let bondingCurvePreSOLBalance = await connection.getBalance(
+      bondingCurvePDA
+    );
+
+    let bondingCurvePreSPLBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      bondingCurvePDA,
+      true
+    );
+
+    let tx = await program.methods
+      .withdraw()
+      .accounts({
+        user: withdrawAuthority.publicKey,
+        mint: mint.publicKey,
+      })
+      .transaction();
+
+    await sendTransaction(
+      program,
+      tx,
+      [withdrawAuthority],
+      withdrawAuthority.publicKey
+    );
+
+    let minBalanceRentExempt =
+      await connection.getMinimumBalanceForRentExemption(8 + 41);
+    let bondingCurvePostSOLBalance = await connection.getBalance(
+      bondingCurvePDA
+    );
+
+    //confirm PDA only remaining balance is rent exempt
+    assert.equal(bondingCurvePostSOLBalance, minBalanceRentExempt);
+
+    let withdrawAuthorityPostSOLBalance = await connection.getBalance(
+      withdrawAuthority.publicKey
+    );
+    let withdrawAuthorityBalanceDiff =
+      withdrawAuthorityPostSOLBalance - withdrawAuthorityPreSOLBalance;
+    let hasBalanceRisenMoreThenCurve =
+      withdrawAuthorityBalanceDiff - minBalanceRentExempt >
+      bondingCurvePreSOLBalance - minBalanceRentExempt;
+
+    assert.isTrue(hasBalanceRisenMoreThenCurve);
+
+    let withdrawAuthorityPostSPLBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      withdrawAuthority.publicKey
+    );
+
+    let bondingCurvePostSPLBalance = await getSPLBalance(
+      connection,
+      mint.publicKey,
+      bondingCurvePDA,
+      true
+    );
+
+    assert.equal(withdrawAuthorityPostSPLBalance, bondingCurvePreSPLBalance);
+    assert.equal(bondingCurvePostSPLBalance, "0");
+
+    let bondingCurveAccount = await program.account.bondingCurve.fetch(
+      bondingCurvePDA
+    );
+
+    //confirm PDA has enough rent
+    assert.notEqual(bondingCurveAccount, null);
+  });
+
   //param unit tests
   it("can set params", async () => {
+    const randomFeeRecipient = anchor.web3.Keypair.generate();
+    const randomWithdrawAuthority = anchor.web3.Keypair.generate();
+
     let tx = await program.methods
       .setParams(
-        TOKEN_METADATA_PROGRAM_ID,
+        randomFeeRecipient.publicKey,
+        randomWithdrawAuthority.publicKey,
         new BN(1000),
         new BN(2000),
         new BN(3000),
@@ -690,7 +841,11 @@ describe("curve-social", () => {
     if (setParamsEvent != null) {
       assert.equal(
         setParamsEvent.feeRecipient.toBase58(),
-        TOKEN_METADATA_PROGRAM_ID.toBase58()
+        randomFeeRecipient.publicKey.toBase58()
+      );
+      assert.equal(
+        setParamsEvent.withdrawAuthority.toBase58(),
+        randomWithdrawAuthority.publicKey.toBase58()
       );
       assert.equal(
         setParamsEvent.initialVirtualTokenReserves.toString(),
@@ -716,7 +871,11 @@ describe("curve-social", () => {
 
     assert.equal(
       global.feeRecipient.toBase58(),
-      TOKEN_METADATA_PROGRAM_ID.toBase58()
+      randomFeeRecipient.publicKey.toBase58()
+    );
+    assert.equal(
+      global.withdrawAuthority.toBase58(),
+      randomWithdrawAuthority.publicKey.toBase58()
     );
     assert.equal(
       global.initialVirtualTokenReserves.toString(),
@@ -737,9 +896,13 @@ describe("curve-social", () => {
   it("can't set params as non-authority", async () => {
     let errorCode = "";
     try {
+      const randomFeeRecipient = anchor.web3.Keypair.generate();
+      const randomWithdrawAuthority = anchor.web3.Keypair.generate();
+
       await program.methods
         .setParams(
-          TOKEN_METADATA_PROGRAM_ID,
+          randomFeeRecipient.publicKey,
+          randomWithdrawAuthority.publicKey,
           new BN(1000),
           new BN(2000),
           new BN(3000),
@@ -763,6 +926,4 @@ describe("curve-social", () => {
 });
 
 //TODO: Tests
-// test buy
-// complete curve
 // test sell whole curve

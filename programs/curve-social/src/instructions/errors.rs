@@ -11,6 +11,8 @@ pub enum CurveSocialError {
     InvalidAuthority,
     #[msg("Bonding Curve Complete")]
     BondingCurveComplete,
+    #[msg("Bonding Curve Not Complete")]
+    BondingCurveNotComplete,
     #[msg("Insufficient Tokens")]
     InsufficientTokens,
     #[msg("Insufficient SOL")]
@@ -25,4 +27,6 @@ pub enum CurveSocialError {
     MinSell,
     #[msg("Invalid Fee Recipient")]
     InvalidFeeRecipient,
+    #[msg("Invalid Withdraw Authority")]
+    InvalidWithdrawAuthority,
 }

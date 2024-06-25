@@ -14,6 +14,7 @@ pub struct Global {
     pub initial_real_sol_reserves: u64,
     pub initial_token_supply: u64,
     pub fee_basis_points: u64,
+    pub withdraw_authority: Pubkey,
 }
 
 impl Global {
