@@ -8,13 +8,14 @@ import {
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { CurveSocial } from "../target/types/curve_social";
+import { CurveLaunchpad } from "../target/types/curve_launchpad";
 import * as client from "../client/";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 
-type EventKeys = keyof anchor.IdlEvents<CurveSocial>;
 
-const validEventNames: Array<keyof anchor.IdlEvents<CurveSocial>> = [
+type EventKeys = keyof anchor.IdlEvents<CurveLaunchpad>;
+
+const validEventNames: Array<keyof anchor.IdlEvents<CurveLaunchpad>> = [
   "completeEvent",
   "createEvent",
   "setParamsEvent",
@@ -22,7 +23,7 @@ const validEventNames: Array<keyof anchor.IdlEvents<CurveSocial>> = [
 ];
 
 export const getTransactionEvents = (
-  program: anchor.Program<CurveSocial>,
+  program: anchor.Program<CurveLaunchpad>,
   txResponse: anchor.web3.VersionedTransactionResponse | null
 ) => {
   if (!txResponse) {
@@ -69,16 +70,16 @@ export const getTransactionEvents = (
 
 const isEventName = (
   eventName: string
-): eventName is keyof anchor.IdlEvents<CurveSocial> => {
+): eventName is keyof anchor.IdlEvents<CurveLaunchpad> => {
   return validEventNames.includes(
-    eventName as keyof anchor.IdlEvents<CurveSocial>
+    eventName as keyof anchor.IdlEvents<CurveLaunchpad>
   );
 };
 
 export const toEvent = <E extends EventKeys>(
   eventName: E,
   event: any
-): anchor.IdlEvents<CurveSocial>[E] | null => {
+): anchor.IdlEvents<CurveLaunchpad>[E] | null => {
   if (isEventName(eventName)) {
     return getEvent(eventName, event.data);
   }
@@ -87,8 +88,8 @@ export const toEvent = <E extends EventKeys>(
 
 const getEvent = <E extends EventKeys>(
   eventName: E,
-  event: anchor.IdlEvents<CurveSocial>[E]
-): anchor.IdlEvents<CurveSocial>[E] => {
+  event: anchor.IdlEvents<CurveLaunchpad>[E]
+): anchor.IdlEvents<CurveLaunchpad>[E] => {
   return event;
 };
 
@@ -128,7 +129,7 @@ export const getTxDetails = async (connection: anchor.web3.Connection, sig) => {
 };
 
 export const sendTransaction = async (
-  program: anchor.Program<CurveSocial>,
+  program: anchor.Program<CurveLaunchpad>,
   tx: Transaction,
   signers: anchor.web3.Signer[],
   payer: PublicKey
@@ -169,7 +170,7 @@ export const fundAccountSOL = async (
 };
 
 export const ammFromBondingCurve = (
-  bondingCurveAccount: anchor.IdlAccounts<CurveSocial>["bondingCurve"] | null,
+  bondingCurveAccount: anchor.IdlAccounts<CurveLaunchpad>["bondingCurve"] | null,
   initialVirtualTokenReserves: bigint
 ) => {
   if(!bondingCurveAccount) throw new Error("Bonding curve account not found");

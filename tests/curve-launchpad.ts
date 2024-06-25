@@ -1,6 +1,6 @@
 import * as anchor from "@coral-xyz/anchor";
 import { Program } from "@coral-xyz/anchor";
-import { CurveSocial } from "../target/types/curve_social";
+import { CurveLaunchpad } from "../target/types/curve_launchpad";
 import { LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import {
   ammFromBondingCurve,
@@ -25,7 +25,7 @@ const BONDING_CURVE_SEED = "bonding-curve";
 
 //TODO: Unit test order is essential, need to refactor to make it so its not.
 
-describe("curve-social", () => {
+describe("curve-launchpad", () => {
   const DEFAULT_DECIMALS = 6n;
   const DEFAULT_TOKEN_BALANCE =
     1_000_000_000n * BigInt(10 ** Number(DEFAULT_DECIMALS));
@@ -38,7 +38,7 @@ describe("curve-social", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.CurveSocial as Program<CurveSocial>;
+  const program = anchor.workspace.CurveSocial as Program<CurveLaunchpad>;
 
   const connection = provider.connection;
   const authority = anchor.web3.Keypair.generate();
@@ -765,11 +765,15 @@ describe("curve-social", () => {
     //confirm PDA only remaining balance is rent exempt
     assert.equal(bondingCurvePostSOLBalance, minBalanceRentExempt);
 
+
+    //check if there is more SOL in withdraw authority then the bonding curve pre transfer
+    //TODO: Calculate the correct amount of SOL that should be in the withdraw authority
     let withdrawAuthorityPostSOLBalance = await connection.getBalance(
       withdrawAuthority.publicKey
     );
     let withdrawAuthorityBalanceDiff =
       withdrawAuthorityPostSOLBalance - withdrawAuthorityPreSOLBalance;
+
     let hasBalanceRisenMoreThenCurve =
       withdrawAuthorityBalanceDiff - minBalanceRentExempt >
       bondingCurvePreSOLBalance - minBalanceRentExempt;

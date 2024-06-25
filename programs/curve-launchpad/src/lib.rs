@@ -9,7 +9,7 @@ pub mod amm;
 declare_id!("GVapdHoG4xjJZpvGPd8EUBaUJKR5Txpf6VHnVwBVCY69");
 
 #[program]
-pub mod curve_social {
+pub mod curve_launchpad {
 
     use super::*;
 

@@ -821,7 +821,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "curve-social"
+name = "curve-launchpad"
 version = "0.1.0"
 dependencies = [
  "anchor-lang",
