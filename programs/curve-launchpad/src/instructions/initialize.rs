@@ -1,4 +1,4 @@
-use crate::{state::Global, CurveSocialError, DEFAULT_TOKEN_SUPPLY};
+use crate::{state::Global, CurveLaunchpadError, DEFAULT_TOKEN_SUPPLY};
 use anchor_lang::prelude::*;
 
 
@@ -25,7 +25,7 @@ pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
 
     require!(
         !global.initialized,
-        CurveSocialError::AlreadyInitialized,
+        CurveLaunchpadError::AlreadyInitialized,
     );
 
     global.authority = *ctx.accounts.authority.to_account_info().key;

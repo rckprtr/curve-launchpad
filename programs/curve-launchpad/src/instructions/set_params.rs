@@ -1,4 +1,4 @@
-use crate::{state::Global, CurveSocialError, SetParamsEvent};
+use crate::{state::Global, CurveLaunchpadError, SetParamsEvent};
 use anchor_lang::prelude::*;
 
 #[event_cpi]
@@ -31,13 +31,13 @@ pub fn set_params(
     //confirm program is initialized
     require!(
         global.initialized,
-        CurveSocialError::NotInitialized
+        CurveLaunchpadError::NotInitialized
     );
 
     //confirm user is the authority
     require!(
         global.authority == *ctx.accounts.user.to_account_info().key,
-        CurveSocialError::InvalidAuthority
+        CurveLaunchpadError::InvalidAuthority
     );
     
     global.fee_recipient = fee_recipient;

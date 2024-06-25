@@ -1,5 +1,5 @@
 use crate::{
-    state::{BondingCurve, Global}, CreateEvent, CurveSocialError, DEFAULT_DECIMALS
+    state::{BondingCurve, Global}, CreateEvent, CurveLaunchpadError, DEFAULT_DECIMALS
 };
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -87,7 +87,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     //confirm program is initialized
     require!(
         ctx.accounts.global.initialized,
-        CurveSocialError::NotInitialized
+        CurveLaunchpadError::NotInitialized
     );
 
     msg!("create::BondingCurve::get_lamports: {:?}", &ctx.accounts.bonding_curve.get_lamports());

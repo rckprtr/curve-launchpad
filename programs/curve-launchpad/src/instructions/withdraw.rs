@@ -6,7 +6,7 @@ use anchor_spl::{
 
 use crate::{
     state::{BondingCurve, Global, LastWithdraw},
-    CurveSocialError,
+    CurveLaunchpadError,
 };
 
 #[derive(Accounts)]
@@ -63,17 +63,17 @@ pub struct Withdraw<'info> {
 pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
     require!(
         ctx.accounts.global.initialized,
-        CurveSocialError::NotInitialized
+        CurveLaunchpadError::NotInitialized
     );
 
     require!(
         ctx.accounts.bonding_curve.complete == true,
-        CurveSocialError::BondingCurveNotComplete,
+        CurveLaunchpadError::BondingCurveNotComplete,
     );
 
     require!(
         ctx.accounts.user.key() == ctx.accounts.global.withdraw_authority,
-        CurveSocialError::InvalidWithdrawAuthority,
+        CurveLaunchpadError::InvalidWithdrawAuthority,
     );
 
     //transfer tokens to withdraw authority from bonding curve

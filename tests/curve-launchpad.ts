@@ -38,7 +38,7 @@ describe("curve-launchpad", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.CurveSocial as Program<CurveLaunchpad>;
+  const program = anchor.workspace.CurveLaunchpad as Program<CurveLaunchpad>;
 
   const connection = provider.connection;
   const authority = anchor.web3.Keypair.generate();

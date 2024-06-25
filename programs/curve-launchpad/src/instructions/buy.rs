@@ -2,7 +2,7 @@ use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
-    amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveSocialError, TradeEvent
+    amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveLaunchpadError, TradeEvent
 };
 
 #[event_cpi]
@@ -52,28 +52,28 @@ pub struct Buy<'info> {
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
     require!(
         ctx.accounts.global.initialized,
-        CurveSocialError::NotInitialized
+        CurveLaunchpadError::NotInitialized
     );
 
     //bonding curve is not complete
     require!(
         ctx.accounts.bonding_curve.complete == false,
-        CurveSocialError::BondingCurveComplete,
+        CurveLaunchpadError::BondingCurveComplete,
     );
 
     //invalid fee recipient
     require!(
         ctx.accounts.fee_recipient.key == &ctx.accounts.global.fee_recipient,
-        CurveSocialError::InvalidFeeRecipient,
+        CurveLaunchpadError::InvalidFeeRecipient,
     );
 
     //bonding curve has enough tokens
     require!(
         ctx.accounts.bonding_curve.real_token_reserves >= token_amount,
-        CurveSocialError::InsufficientTokens,
+        CurveLaunchpadError::InsufficientTokens,
     );
 
-    require!(token_amount > 0, CurveSocialError::MinBuy,);
+    require!(token_amount > 0, CurveLaunchpadError::MinBuy,);
 
     let targe_token_amount = if ctx.accounts.bonding_curve_token_account.amount < token_amount {
         ctx.accounts.bonding_curve_token_account.amount
@@ -96,13 +96,13 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     //check if the amount of SOL to transfe plus fee is less than the max_sol_cost
     require!(
         buy_amount_with_fee <= max_sol_cost,
-        CurveSocialError::MaxSOLCostExceeded,
+        CurveLaunchpadError::MaxSOLCostExceeded,
     );
 
     //check if the user has enough SOL
     require!(
         ctx.accounts.user.lamports() >= buy_amount_with_fee,
-        CurveSocialError::InsufficientSOL,
+        CurveLaunchpadError::InsufficientSOL,
     );
     
     // transfer SOL to bonding curve

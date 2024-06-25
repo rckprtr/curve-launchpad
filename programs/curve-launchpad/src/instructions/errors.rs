@@ -2,7 +2,7 @@ use anchor_lang::error_code;
 
 
 #[error_code]
-pub enum CurveSocialError {
+pub enum CurveLaunchpadError {
     #[msg("Global Already Initialized")]
     AlreadyInitialized,
     #[msg("Global Not Initialized")]
