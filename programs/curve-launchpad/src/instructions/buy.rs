@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, solana_program::system_instruction};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self as token, Mint, TokenInterface, TokenAccount, TransferChecked};
 
 use crate::{
     amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveLaunchpadError, TradeEvent
@@ -21,7 +21,7 @@ pub struct Buy<'info> {
     #[account(mut)]
     fee_recipient: AccountInfo<'info>,
 
-    mint: Account<'info, Mint>,
+    mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -35,18 +35,18 @@ pub struct Buy<'info> {
         associated_token::mint = mint,
         associated_token::authority = bonding_curve,
     )]
-    bonding_curve_token_account: Box<Account<'info, TokenAccount>>,
+    bonding_curve_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         associated_token::mint = mint,
         associated_token::authority = user,
     )]
-    user_token_account: Box<Account<'info, TokenAccount>>,
+    user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     system_program: Program<'info, System>,
 
-    token_program: Program<'info, Token>,
+    token_program: Interface<'info, TokenInterface>,
 }
 
 pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
@@ -145,7 +145,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     )?;
 
     //transfer SPL
-    let cpi_accounts = Transfer {
+    let cpi_accounts = TransferChecked {
         from: ctx
             .accounts
             .bonding_curve_token_account
@@ -153,6 +153,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
             .clone(),
         to: ctx.accounts.user_token_account.to_account_info().clone(),
         authority: ctx.accounts.bonding_curve.to_account_info().clone(),
+        mint: ctx.accounts.mint.to_account_info().clone(),
     };
 
     let signer: [&[&[u8]]; 1] = [&[
@@ -161,13 +162,14 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         &[ctx.bumps.bonding_curve],
     ]];
 
-    token::transfer(
+    token::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
             &signer,
         ),
         buy_result.token_amount,
+        crate::DEFAULT_DECIMALS.try_into().unwrap()
     )?;
 
     //apply the buy to the bonding curve

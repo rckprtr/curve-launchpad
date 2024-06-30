@@ -5,7 +5,7 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-curve_launchpad = "GVapdHoG4xjJZpvGPd8EUBaUJKR5Txpf6VHnVwBVCY69"
+curve_launchpad = "Uz9Fn2tCcMJ2VmZE4tSHwh61pKVRepJVoHDXQDRhUej"
 
 [registry]
 url = "https://api.apr.dev"

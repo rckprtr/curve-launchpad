@@ -8,8 +8,8 @@ use anchor_spl::{
         create_metadata_accounts_v3, mpl_token_metadata::types::DataV2, CreateMetadataAccountsV3,
         Metadata as Metaplex,
     },
-    token::{
-        self, mint_to, spl_token::instruction::AuthorityType, Mint, MintTo, Token, TokenAccount,
+    token_interface::{
+        self as token, mint_to, spl_token_2022::instruction::AuthorityType, Mint, MintTo, TokenInterface, TokenAccount,
     },
 };
 
@@ -23,7 +23,7 @@ pub struct Create<'info> {
         mint::authority = mint_authority,
         mint::freeze_authority = mint_authority
     )]
-    mint: Account<'info, Mint>,
+    mint: InterfaceAccount<'info, Mint>,
 
     #[account(mut)]
     creator: Signer<'info>,
@@ -50,7 +50,7 @@ pub struct Create<'info> {
         associated_token::mint = mint,
         associated_token::authority = bonding_curve,
     )]
-    bonding_curve_token_account: Box<Account<'info, TokenAccount>>,
+    bonding_curve_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         seeds = [Global::SEED_PREFIX],
@@ -73,7 +73,7 @@ pub struct Create<'info> {
 
     system_program: Program<'info, System>,
 
-    token_program: Program<'info, Token>,
+    token_program: Interface<'info, TokenInterface>,
 
     associated_token_program: Program<'info, AssociatedToken>,
 
@@ -153,6 +153,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     bonding_curve.real_token_reserves = ctx.accounts.global.initial_real_token_reserves;
     bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
     bonding_curve.complete = false;
+    bonding_curve.creator = *ctx.accounts.creator.to_account_info().key;
 
     emit_cpi!(CreateEvent {
         name,

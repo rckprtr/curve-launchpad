@@ -19,3 +19,6 @@ idl-build = ["anchor-lang/idl-build", "anchor-spl/idl-build"]
 [dependencies]
 anchor-lang = {version="0.30.1", features = ["init-if-needed", "event-cpi"]}
 anchor-spl = { version = "0.30.1", features = ["metadata"] }
+spl-tlv-account-resolution = "0.6.0"
+spl-token-2022 = "3.0.0"
+spl-transfer-hook-interface = "0.6.0"
