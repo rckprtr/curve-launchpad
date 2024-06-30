@@ -2,7 +2,7 @@ use crate::{
     amm, calculate_fee, state::{BondingCurve, Global}, CurveLaunchpadError, TradeEvent
 };
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token_interface::{self as token, Mint, TokenInterface, TokenAccount, TransferChecked};
 
 #[event_cpi]
 #[derive(Accounts)]
@@ -20,7 +20,7 @@ pub struct Sell<'info> {
     #[account(mut)]
     fee_recipient: AccountInfo<'info>,
 
-    mint: Account<'info, Mint>,
+    mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         mut,
@@ -34,18 +34,18 @@ pub struct Sell<'info> {
         associated_token::mint = mint,
         associated_token::authority = bonding_curve,
     )]
-    bonding_curve_token_account: Box<Account<'info, TokenAccount>>,
+    bonding_curve_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         associated_token::mint = mint,
         associated_token::authority = user,
     )]
-    user_token_account: Box<Account<'info, TokenAccount>>,
+    user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     system_program: Program<'info, System>,
 
-    token_program: Program<'info, Token>,
+    token_program: Interface<'info, TokenInterface>,
 }
 
 pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
@@ -96,7 +96,7 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
     );
 
     //transfer SPL
-    let cpi_accounts = Transfer {
+    let cpi_accounts = TransferChecked {
         from: ctx.accounts.user_token_account.to_account_info().clone(),
         to: ctx
             .accounts
@@ -104,15 +104,17 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
             .to_account_info()
             .clone(),
         authority: ctx.accounts.user.to_account_info().clone(),
+        mint: ctx.accounts.mint.to_account_info().clone(),
     };
 
-    token::transfer(
+    token::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
             &[],
         ),
         sell_result.token_amount,
+        crate::DEFAULT_DECIMALS.try_into().unwrap()
     )?;
 
     //transfer SOL back to user

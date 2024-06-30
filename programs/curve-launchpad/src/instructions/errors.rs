@@ -29,4 +29,8 @@ pub enum CurveLaunchpadError {
     InvalidFeeRecipient,
     #[msg("Invalid Withdraw Authority")]
     InvalidWithdrawAuthority,
+    #[msg("Transfer Cooldown Not Met")]
+    TransferCooldownNotMet,
+    #[msg("Transfer Limit Exceeded")]
+    TransferLimitExceeded,
 }

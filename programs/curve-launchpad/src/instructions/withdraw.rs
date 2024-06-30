@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token::{self, Mint, Token, TokenAccount, Transfer},
+    token_interface::{self as token, Mint, TokenInterface, TokenAccount, TransferChecked},
 };
 
 use crate::{
@@ -20,7 +20,7 @@ pub struct Withdraw<'info> {
     )]
     global: Box<Account<'info, Global>>,
 
-    mint: Account<'info, Mint>,
+    mint: InterfaceAccount<'info, Mint>,
 
     #[account(
         init_if_needed,
@@ -43,7 +43,7 @@ pub struct Withdraw<'info> {
         associated_token::mint = mint,
         associated_token::authority = bonding_curve,
     )]
-    bonding_curve_token_account: Box<Account<'info, TokenAccount>>,
+    bonding_curve_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -51,13 +51,13 @@ pub struct Withdraw<'info> {
         associated_token::mint = mint,
         associated_token::authority = user,
     )]
-    user_token_account: Box<Account<'info, TokenAccount>>,
+    user_token_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     associated_token_program: Program<'info, AssociatedToken>,
 
     system_program: Program<'info, System>,
 
-    token_program: Program<'info, Token>,
+    token_program: Interface<'info, TokenInterface>,
 }
 
 pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
@@ -77,7 +77,7 @@ pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
     );
 
     //transfer tokens to withdraw authority from bonding curve
-    let cpi_accounts = Transfer {
+    let cpi_accounts = TransferChecked {
         from: ctx
             .accounts
             .bonding_curve_token_account
@@ -85,6 +85,7 @@ pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
             .clone(),
         to: ctx.accounts.user_token_account.to_account_info().clone(),
         authority: ctx.accounts.bonding_curve.to_account_info().clone(),
+        mint: ctx.accounts.mint.to_account_info().clone(),
     };
 
     let signer: [&[&[u8]]; 1] = [&[
@@ -93,13 +94,14 @@ pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
         &[ctx.bumps.bonding_curve],
     ]];
 
-    token::transfer(
+    token::transfer_checked(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             cpi_accounts,
             &signer,
         ),
         ctx.accounts.bonding_curve_token_account.amount,
+        crate::DEFAULT_DECIMALS.try_into().unwrap()
     )?;
 
     //transer sol to withdraw authority from bonding curve

@@ -10,6 +10,7 @@ pub struct BondingCurve {
     pub real_token_reserves: u64,
     pub token_total_supply: u64,
     pub complete: bool,
+    pub creator: Pubkey
 }
 
 impl BondingCurve {
