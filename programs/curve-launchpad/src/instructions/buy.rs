@@ -1,5 +1,5 @@
 use anchor_lang::{prelude::*, solana_program::system_instruction};
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Mint, MintTo, Token, TokenAccount, Transfer};
 
 use crate::{
     amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveLaunchpadError, TradeEvent
@@ -53,12 +53,6 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     require!(
         ctx.accounts.global.initialized,
         CurveLaunchpadError::NotInitialized
-    );
-
-    //bonding curve is not complete
-    require!(
-        ctx.accounts.bonding_curve.complete == false,
-        CurveLaunchpadError::BondingCurveComplete,
     );
 
     //invalid fee recipient
@@ -144,27 +138,21 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         &[],
     )?;
 
-    //transfer SPL
-    let cpi_accounts = Transfer {
-        from: ctx
-            .accounts
-            .bonding_curve_token_account
-            .to_account_info()
-            .clone(),
-        to: ctx.accounts.user_token_account.to_account_info().clone(),
-        authority: ctx.accounts.bonding_curve.to_account_info().clone(),
-    };
-
     let signer: [&[&[u8]]; 1] = [&[
         BondingCurve::SEED_PREFIX,
         ctx.accounts.mint.to_account_info().key.as_ref(),
         &[ctx.bumps.bonding_curve],
     ]];
 
-    token::transfer(
+
+    token::mint_to(
         CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
-            cpi_accounts,
+            MintTo {
+                mint: ctx.accounts.mint.to_account_info().clone(),
+                to: ctx.accounts.user_token_account.to_account_info().clone(),
+                authority: ctx.accounts.bonding_curve.to_account_info().clone(),
+            },
             &signer,
         ),
         buy_result.token_amount,
@@ -205,3 +193,4 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
 
     Ok(())
 }
+
