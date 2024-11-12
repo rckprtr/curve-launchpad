@@ -5,8 +5,8 @@ use anchor_spl::{
 };
 
 use crate::{
+    errors::CurveLaunchpadError,
     state::{BondingCurve, Global, LastWithdraw},
-    CurveLaunchpadError,
 };
 
 #[derive(Accounts)]
@@ -60,12 +60,7 @@ pub struct Withdraw<'info> {
     token_program: Program<'info, Token>,
 }
 
-pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
-    require!(
-        ctx.accounts.global.initialized,
-        CurveLaunchpadError::NotInitialized
-    );
-
+pub fn handle(ctx: Context<Withdraw>) -> Result<()> {
     require!(
         ctx.accounts.bonding_curve.complete == true,
         CurveLaunchpadError::BondingCurveNotComplete,

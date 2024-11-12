@@ -1,6 +1,17 @@
 use anchor_lang::prelude::*;
 use std::fmt;
 
+#[derive(AnchorSerialize, AnchorDeserialize)]
+pub struct CreateLaunchpadParam {
+    pub name: String,
+    pub symbol: String,
+    pub uri: String,
+    pub virtual_token_reserves: u64,
+    pub virtual_sol_reserves: u64,
+    pub real_token_reserves: u64,
+    pub token_supply: u64,
+}
+
 #[account]
 #[derive(InitSpace)]
 pub struct BondingCurve {

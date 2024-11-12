@@ -1,6 +1,6 @@
-use crate::{state::Global, CurveLaunchpadError, DEFAULT_TOKEN_SUPPLY};
 use anchor_lang::prelude::*;
 
+use crate::state::Global;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
@@ -16,28 +16,23 @@ pub struct Initialize<'info> {
     )]
     global: Box<Account<'info, Global>>,
 
+    /// CHECK: fee recipient account
+    fee_recipient: UncheckedAccount<'info>,
+
+    /// CHECK: withdraw authority account
+    withdraw_authority: UncheckedAccount<'info>,
+
     system_program: Program<'info, System>,
 }
 
-
-pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+pub fn handle(ctx: Context<Initialize>) -> Result<()> {
     let global = &mut ctx.accounts.global;
 
-    require!(
-        !global.initialized,
-        CurveLaunchpadError::AlreadyInitialized,
-    );
-
-    global.authority = *ctx.accounts.authority.to_account_info().key;
-    global.initialized = true;
-    global.initial_token_supply = DEFAULT_TOKEN_SUPPLY;
-    global.initial_real_sol_reserves = 0;
-    global.initial_real_token_reserves = DEFAULT_TOKEN_SUPPLY;
-    global.initial_virtual_sol_reserves = 30_000_000_000;
-    global.initial_virtual_token_reserves = 1_073_000_000_000_000;
-    global.fee_basis_points = 50;
-
-    msg!("Initialized global state");
+    global.authority = ctx.accounts.authority.to_account_info().key();
+    global.fee_recipient = ctx.accounts.fee_recipient.to_account_info().key();
+    global.withdraw_authority = ctx.accounts.withdraw_authority.to_account_info().key();
+    global.fee_basis_points = 0;
+    global.initial_virtual_token_reserves = 0;
 
     Ok(())
 }

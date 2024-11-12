@@ -141,7 +141,7 @@ export const sendTransaction = async (
   );
   versionedTx.sign(signers);
 
-  let sig = await program.provider.connection.sendTransaction(versionedTx);
+  let sig = await program.provider.connection.sendTransaction(versionedTx, {});
   let response = await getTxDetails(program.provider.connection, sig);
   let events = getTransactionEvents(program, response);
   return {
@@ -173,7 +173,7 @@ export const ammFromBondingCurve = (
   bondingCurveAccount: anchor.IdlAccounts<CurveLaunchpad>["bondingCurve"] | null,
   initialVirtualTokenReserves: bigint
 ) => {
-  if(!bondingCurveAccount) throw new Error("Bonding curve account not found");
+  if (!bondingCurveAccount) throw new Error("Bonding curve account not found");
   return new client.AMM(
     BigInt(bondingCurveAccount.virtualSolReserves.toString()),
     BigInt(bondingCurveAccount.virtualTokenReserves.toString()),
