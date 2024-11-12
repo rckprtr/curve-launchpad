@@ -20,8 +20,8 @@ wallet = "~/.config/solana/id.json"
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.spec.ts"
 
 [test]
-startup_wait = 5000
-shutdown_wait = 2000
+startup_wait = 10000
+shutdown_wait = 5000
 upgradeable = false
 
 [[test.genesis]]

@@ -1,5 +1,5 @@
 use crate::{
-    state::{BondingCurve, Global}, CreateEvent, CurveLaunchpadError, DEFAULT_DECIMALS
+    constants::DEFAULT_DECIMALS, events::CreateEvent, state::{BondingCurve, CreateLaunchpadParam, Global}
 };
 use anchor_lang::prelude::*;
 use anchor_spl::{
@@ -83,12 +83,8 @@ pub struct Create<'info> {
 }
 
 
-pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -> Result<()> {
-    //confirm program is initialized
-    require!(
-        ctx.accounts.global.initialized,
-        CurveLaunchpadError::NotInitialized
-    );
+pub fn handle(ctx: Context<Create>, param: CreateLaunchpadParam) -> Result<()> {
+    let CreateLaunchpadParam {name, symbol,uri, virtual_sol_reserves, virtual_token_reserves, real_token_reserves, token_supply} = param;
 
     msg!("create::BondingCurve::get_lamports: {:?}", &ctx.accounts.bonding_curve.get_lamports());
 
@@ -132,7 +128,7 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
             },
             &signer,
         ),
-        ctx.accounts.global.initial_token_supply,
+        token_supply,
     )?;
 
     //remove mint_authority
@@ -147,11 +143,11 @@ pub fn create(ctx: Context<Create>, name: String, symbol: String, uri: String) -
     token::set_authority(cpi_context, AuthorityType::MintTokens, None)?;
 
     let bonding_curve = &mut ctx.accounts.bonding_curve;
-    bonding_curve.virtual_sol_reserves = ctx.accounts.global.initial_virtual_sol_reserves;
-    bonding_curve.virtual_token_reserves = ctx.accounts.global.initial_virtual_token_reserves;
+    bonding_curve.virtual_sol_reserves = virtual_sol_reserves;
+    bonding_curve.virtual_token_reserves = virtual_token_reserves;
     bonding_curve.real_sol_reserves = 0;
-    bonding_curve.real_token_reserves = ctx.accounts.global.initial_real_token_reserves;
-    bonding_curve.token_total_supply = ctx.accounts.global.initial_token_supply;
+    bonding_curve.real_token_reserves = real_token_reserves;
+    bonding_curve.token_total_supply = token_supply;
     bonding_curve.complete = false;
 
     emit_cpi!(CreateEvent {

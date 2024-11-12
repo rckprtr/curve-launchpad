@@ -2,7 +2,11 @@ use anchor_lang::{prelude::*, solana_program::system_instruction};
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
 
 use crate::{
-    amm, calculate_fee, state::{BondingCurve, Global}, CompleteEvent, CurveLaunchpadError, TradeEvent
+    amm,
+    errors::CurveLaunchpadError,
+    events::{CompleteEvent, TradeEvent},
+    state::{BondingCurve, Global},
+    utils::calculate_fee,
 };
 
 #[event_cpi]
@@ -49,15 +53,10 @@ pub struct Buy<'info> {
     token_program: Program<'info, Token>,
 }
 
-pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
-    require!(
-        ctx.accounts.global.initialized,
-        CurveLaunchpadError::NotInitialized
-    );
-
+pub fn handle(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()> {
     //bonding curve is not complete
     require!(
-        ctx.accounts.bonding_curve.complete == false,
+        !ctx.accounts.bonding_curve.complete,
         CurveLaunchpadError::BondingCurveComplete,
     );
 
@@ -92,7 +91,11 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     let buy_result = amm.apply_buy(targe_token_amount as u128).unwrap();
     let fee = calculate_fee(buy_result.sol_amount, ctx.accounts.global.fee_basis_points);
     let buy_amount_with_fee = buy_result.sol_amount + fee;
-    msg!("buy_amount_with_fee: {}, max_sol_cost: {}", buy_amount_with_fee, max_sol_cost);
+    msg!(
+        "buy_amount_with_fee: {}, max_sol_cost: {}",
+        buy_amount_with_fee,
+        max_sol_cost
+    );
 
     //check if the amount of SOL to transfe plus fee is less than the max_sol_cost
     require!(
@@ -105,7 +108,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
         ctx.accounts.user.lamports() >= buy_amount_with_fee,
         CurveLaunchpadError::InsufficientSOL,
     );
-    
+
     // transfer SOL to bonding curve
     let from_account = &ctx.accounts.user;
     let to_bonding_curve_account = &ctx.accounts.bonding_curve;
@@ -129,11 +132,8 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     //transfer SOL to fee recipient
     let to_fee_recipient_account = &ctx.accounts.fee_recipient;
 
-    let transfer_instruction = system_instruction::transfer(
-        from_account.key,
-        to_fee_recipient_account.key,
-        fee,
-    );
+    let transfer_instruction =
+        system_instruction::transfer(from_account.key, to_fee_recipient_account.key, fee);
 
     anchor_lang::solana_program::program::invoke_signed(
         &transfer_instruction,
@@ -178,13 +178,15 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
     bonding_curve.virtual_token_reserves = amm.virtual_token_reserves as u64;
     bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves as u64;
 
+    let now = Clock::get()?.unix_timestamp;
+
     emit_cpi!(TradeEvent {
         mint: *ctx.accounts.mint.to_account_info().key,
         sol_amount: buy_result.sol_amount,
         token_amount: buy_result.token_amount,
         is_buy: true,
         user: *ctx.accounts.user.to_account_info().key,
-        timestamp: Clock::get()?.unix_timestamp,
+        timestamp: now,
         virtual_sol_reserves: bonding_curve.virtual_sol_reserves,
         virtual_token_reserves: bonding_curve.virtual_token_reserves,
         real_sol_reserves: bonding_curve.real_sol_reserves,
@@ -198,7 +200,7 @@ pub fn buy(ctx: Context<Buy>, token_amount: u64, max_sol_cost: u64) -> Result<()
             user: *ctx.accounts.user.to_account_info().key,
             mint: *ctx.accounts.mint.to_account_info().key,
             bonding_curve: *ctx.accounts.bonding_curve.to_account_info().key,
-            timestamp: Clock::get()?.unix_timestamp,
+            timestamp: now,
         });
     }
 

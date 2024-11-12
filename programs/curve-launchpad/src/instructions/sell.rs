@@ -1,5 +1,9 @@
 use crate::{
-    amm, calculate_fee, state::{BondingCurve, Global}, CurveLaunchpadError, TradeEvent
+    amm,
+    errors::CurveLaunchpadError,
+    events::TradeEvent,
+    state::{BondingCurve, Global},
+    utils::calculate_fee,
 };
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
@@ -48,7 +52,7 @@ pub struct Sell<'info> {
     token_program: Program<'info, Token>,
 }
 
-pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
+pub fn handle(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Result<()> {
     //check if bonding curve is complete
     require!(
         !ctx.accounts.bonding_curve.complete,
@@ -127,12 +131,13 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
     **from_account.to_account_info().try_borrow_mut_lamports()? -= fee;
     **ctx.accounts.fee_recipient.try_borrow_mut_lamports()? += fee;
 
-
     let bonding_curve = &mut ctx.accounts.bonding_curve;
     bonding_curve.real_token_reserves = amm.real_token_reserves as u64;
     bonding_curve.real_sol_reserves = amm.real_sol_reserves as u64;
     bonding_curve.virtual_token_reserves = amm.virtual_token_reserves as u64;
     bonding_curve.virtual_sol_reserves = amm.virtual_sol_reserves as u64;
+
+    let now = Clock::get()?.unix_timestamp;
 
     emit_cpi!(TradeEvent {
         mint: *ctx.accounts.mint.to_account_info().key,
@@ -140,7 +145,7 @@ pub fn sell(ctx: Context<Sell>, token_amount: u64, min_sol_output: u64) -> Resul
         token_amount: sell_result.token_amount,
         is_buy: false,
         user: *ctx.accounts.user.to_account_info().key,
-        timestamp: Clock::get()?.unix_timestamp,
+        timestamp: now,
         virtual_sol_reserves: bonding_curve.virtual_sol_reserves,
         virtual_token_reserves: bonding_curve.virtual_token_reserves,
         real_sol_reserves: bonding_curve.real_sol_reserves,

@@ -99,7 +99,7 @@ pub struct Migrate<'info> {
     pub rent: Sysvar<'info, Rent>,
 }
 
-pub fn process(ctx: Context<Migrate>) -> Result<()> {
+pub fn handle(ctx: Context<Migrate>) -> Result<()> {
     // Wrap SOL into WSOL from creator
     // let minimum_rent_fee = 200_000_000;
     let minimum_rent_fee = 1_100_000_000;
